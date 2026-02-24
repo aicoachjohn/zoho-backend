@@ -22,6 +22,7 @@ export default async function handler(req, res) {
 
   try {
 
+    // 🔹 Generate fresh access token
     const tokenResponse = await fetch(
       "https://accounts.zoho.in/oauth/v2/token",
       {
@@ -41,11 +42,37 @@ export default async function handler(req, res) {
     const tokenData = await tokenResponse.json();
 
     if (!tokenData.access_token) {
-      return res.status(500).json({ error: "Failed to generate access token", details: tokenData });
+      return res.status(500).json({
+        error: "Failed to generate access token",
+        details: tokenData
+      });
     }
 
     const accessToken = tokenData.access_token;
 
+    // 🔹 Split full name into First_Name and Last_Name
+    const nameParts = formFields.fullName?.split(" ") || [];
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "NA";
+
+    // 🔹 Map frontend fields to Zoho API names
+    const zohoData = {
+      First_Name: firstName,
+      Last_Name: lastName,
+      Email: formFields.email,
+      Mobile: formFields.mobile,
+      Country: formFields.country,
+      Street: formFields.address,
+      Course_Name: formFields.courseName,
+      Course_Type: formFields.courseType,
+      Lecture_Language: formFields.lectureLanguage,
+      Course_Start_Date: formFields.courseStartDate,
+      Payment_Method: formFields.paymentMethod,
+      Amount_Paid: formFields.amountPaid,
+      Enrollment_Status: "Enrollment Form Submitted"
+    };
+
+    // 🔹 Update Lead in Zoho
     const response = await fetch(
       `https://www.zohoapis.in/crm/v2/Leads/${lead_id}`,
       {
@@ -55,12 +82,7 @@ export default async function handler(req, res) {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          data: [
-            {
-              ...formFields,
-              Enrollment_Status: "Enrollment Form Submitted"
-            }
-          ]
+          data: [zohoData]
         })
       }
     );
