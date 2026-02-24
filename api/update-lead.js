@@ -1,5 +1,15 @@
 export default async function handler(req, res) {
 
+  // ✅ CORS Headers
+  res.setHeader("Access-Control-Allow-Origin", "https://enroll.proitbridge.com");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // ✅ Handle preflight request
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
@@ -12,7 +22,6 @@ export default async function handler(req, res) {
 
   try {
 
-    // 🔹 Generate fresh access token using refresh token
     const tokenResponse = await fetch(
       "https://accounts.zoho.in/oauth/v2/token",
       {
@@ -37,7 +46,6 @@ export default async function handler(req, res) {
 
     const accessToken = tokenData.access_token;
 
-    // 🔹 Update Zoho Lead
     const response = await fetch(
       `https://www.zohoapis.in/crm/v2/Leads/${lead_id}`,
       {
