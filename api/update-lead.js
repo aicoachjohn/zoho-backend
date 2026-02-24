@@ -5,7 +5,6 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  // ✅ Handle preflight request
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -14,15 +13,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
-  const { lead_id, ...formFields } = req.body;
+  const { pib_id, ...formFields } = req.body;
 
-  if (!lead_id) {
-    return res.status(400).json({ message: "Missing lead_id" });
+  if (!pib_id) {
+    return res.status(400).json({ message: "Missing pib_id" });
   }
 
   try {
 
-    // 🔹 Generate fresh access token
+    // 🔹 Step 1: Generate fresh access token
     const tokenResponse = await fetch(
       "https://accounts.zoho.in/oauth/v2/token",
       {
@@ -50,12 +49,31 @@ export default async function handler(req, res) {
 
     const accessToken = tokenData.access_token;
 
-    // 🔹 Split full name into First_Name and Last_Name
+    // 🔹 Step 2: Search Lead by PIB_LEAD_ID
+    const searchResponse = await fetch(
+      `https://www.zohoapis.in/crm/v2/Leads/search?criteria=(PIB_LEAD_ID:equals:${pib_id})`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Zoho-oauthtoken ${accessToken}`
+        }
+      }
+    );
+
+    const searchData = await searchResponse.json();
+
+    if (!searchData.data || searchData.data.length === 0) {
+      return res.status(404).json({ message: "Lead not found" });
+    }
+
+    const leadId = searchData.data[0].id;
+
+    // 🔹 Split full name
     const nameParts = formFields.fullName?.split(" ") || [];
     const firstName = nameParts[0] || "";
     const lastName = nameParts.slice(1).join(" ") || "NA";
 
-    // 🔹 Map frontend fields to Zoho API names
+    // 🔹 Map fields to Zoho API names
     const zohoData = {
       First_Name: firstName,
       Last_Name: lastName,
@@ -72,13 +90,13 @@ export default async function handler(req, res) {
       Enrollment_Status: "Enrollment Form Submitted"
     };
 
-    // 🔹 Update Lead in Zoho
-    const response = await fetch(
-      `https://www.zohoapis.in/crm/v2/Leads/${lead_id}`,
+    // 🔹 Step 3: Update Lead
+    const updateResponse = await fetch(
+      `https://www.zohoapis.in/crm/v2/Leads/${leadId}`,
       {
         method: "PUT",
         headers: {
-          "Authorization": `Zoho-oauthtoken ${accessToken}`,
+          Authorization: `Zoho-oauthtoken ${accessToken}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -87,7 +105,7 @@ export default async function handler(req, res) {
       }
     );
 
-    const result = await response.json();
+    const result = await updateResponse.json();
 
     return res.status(200).json(result);
 
