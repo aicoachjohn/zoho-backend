@@ -85,6 +85,7 @@ export default async function handler(req, res) {
       Lecture_Language: formFields.lectureLanguage,
       Course_Start_Date: formFields.courseStartDate,
       Payment_Method: formFields.paymentMethod,
+      Total_Fee: formFields.totalFee,
       Amount_Paid: formFields.amountPaid,
       Balance_Fee: formFields.remainingAmount,   
       Enrollment_Status: "Enrollment Form Submitted"
