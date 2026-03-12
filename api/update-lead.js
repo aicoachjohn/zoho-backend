@@ -68,15 +68,10 @@ export default async function handler(req, res) {
 
     const leadId = searchData.data[0].id;
 
-    // 🔹 Split full name
-    const nameParts = formFields.fullName?.split(" ") || [];
-    const firstName = nameParts[0] || "";
-    const lastName = nameParts.slice(1).join(" ") || "NA";
-
     // 🔹 Map fields to Zoho API names
     const zohoData = {
-      First_Name: firstName,
-      Last_Name: lastName,
+      First_Name: formFields.firstName,
+      Last_Name: formFields.lastName,
       Email: formFields.email,
       Mobile: formFields.mobile,
       Country: formFields.country,
@@ -87,6 +82,7 @@ export default async function handler(req, res) {
       Course_Start_Date: formFields.courseStartDate,
       Payment_Method: formFields.paymentMethod,
       Amount_Paid: formFields.amountPaid,
+      Balance_Fee: formFields.remainingAmount,
       Enrollment_Status: "Enrollment Form Submitted"
     };
 
