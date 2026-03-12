@@ -75,8 +75,8 @@ export default async function handler(req, res) {
 
     // 🔹 Map fields to Zoho API names
     const zohoData = {
-      First_Name: firstName,
-      Last_Name: lastName,
+      First_Name: formFields.firstName,
+      Last_Name: formFields.lastName,
       Email: formFields.email,
       Mobile: formFields.mobile,
       Country: formFields.country,
