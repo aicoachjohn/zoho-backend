@@ -50,7 +50,7 @@ if (!tokenData.access_token) {
 
 const accessToken = tokenData.access_token;
 
-// 🔹 SEARCH LEAD
+// 🔹 SEARCH LEAD (USING AUTO NUMBER)
 const leadRes = await fetch(
   `https://www.zohoapis.in/crm/v2/Leads/search?criteria=(PIB_LEAD_ID:equals:${encodeURIComponent(pib_id)})`,
   { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
@@ -66,7 +66,7 @@ const lead = leadData.data[0];
 const leadId = lead.id;
 const leadOwnerId = lead.Owner.id;
 
-// 🔹 UPDATE LEAD
+// 🔹 UPDATE LEAD (NO PAYMENT DATA)
 await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
   method: "PUT",
   headers: {
@@ -97,27 +97,26 @@ let holdAmount = null;
 let firstInstallment = null;
 let secondInstallment = null;
 
-if (formFields.paymentMethod === "Course Hold") {
+const paymentMethod = formFields.paymentMethod?.trim();
+
+if (paymentMethod === "Course Hold") {
   pipeline = "Course Holding Pipeline";
   stage = "Hold Discussion";
   holdAmount = formFields.amountPaid;
 }
 
-else if (formFields.paymentMethod === "Single Shot") {
+else if (paymentMethod === "Single Shot") {
   pipeline = "Single Shot Pipeline";
   stage = "Payment Pending";
 }
 
-else if (
-  formFields.paymentMethod === "Installment" ||
-  formFields.paymentMethod === "Two Short"
-) {
+else if (paymentMethod === "Installment") {
   pipeline = "Installments Pipeline";
   stage = "Plan Confirmed";
   firstInstallment = formFields.amountPaid;
 }
 
-// 🔹 SEARCH DEAL
+// 🔹 SEARCH DEAL (USING SAME PIB ID)
 const dealRes = await fetch(
   `https://www.zohoapis.in/crm/v2/Deals/search?criteria=(PIB_LEAD_ID:equals:${encodeURIComponent(pib_id)})`,
   { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
@@ -132,7 +131,7 @@ const dealPayload = {
   Pipeline: pipeline,
   Stage: stage,
 
-  Payment_Method: formFields.paymentMethod,
+  Payment_Method: paymentMethod,
 
   Total_Fee: formFields.totalFee,
   Amount_Paid: formFields.amountPaid,
@@ -141,9 +140,7 @@ const dealPayload = {
   st_Installment_Amount: firstInstallment,
   nd_Installment_Amount: secondInstallment,
 
-  Payment_Status: "Partial",
-
-  PIB_LEAD_ID: pib_id
+  Payment_Status: "Partial"
 };
 
 // 🔹 CREATE / UPDATE DEAL
@@ -176,7 +173,11 @@ if (!dealData.data || dealData.data.length === 0) {
   });
 }
 
-return res.status(200).json({ message: "Success" });
+// ✅ FIXED SUCCESS RESPONSE
+return res.status(200).json({
+  success: true,
+  message: "Enrollment successful"
+});
 
 
 } catch (err) {
