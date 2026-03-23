@@ -101,12 +101,17 @@ if (formFields.paymentMethod === "Course Hold") {
   pipeline = "Course Holding Pipeline";
   stage = "Hold Discussion";
   holdAmount = formFields.amountPaid;
-} 
+}
+
 else if (formFields.paymentMethod === "Single Shot") {
   pipeline = "Single Shot Pipeline";
   stage = "Payment Pending";
-} 
-else if (formFields.paymentMethod === "Installment") {
+}
+
+else if (
+  formFields.paymentMethod === "Installment" ||
+  formFields.paymentMethod === "Two Short"
+) {
   pipeline = "Installments Pipeline";
   stage = "Plan Confirmed";
   firstInstallment = formFields.amountPaid;
