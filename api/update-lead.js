@@ -50,7 +50,7 @@ if (!tokenData.access_token) {
 
 const accessToken = tokenData.access_token;
 
-// 🔹 SEARCH LEAD (USING AUTO NUMBER)
+// 🔹 SEARCH LEAD
 const leadRes = await fetch(
   `https://www.zohoapis.in/crm/v2/Leads/search?criteria=(PIB_LEAD_ID:equals:${encodeURIComponent(pib_id)})`,
   { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
@@ -66,7 +66,7 @@ const lead = leadData.data[0];
 const leadId = lead.id;
 const leadOwnerId = lead.Owner.id;
 
-// 🔹 UPDATE LEAD (NO PAYMENT DATA)
+// 🔹 UPDATE LEAD
 await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
   method: "PUT",
   headers: {
@@ -116,7 +116,7 @@ else if (paymentMethod === "Installment") {
   firstInstallment = formFields.amountPaid;
 }
 
-// 🔹 SEARCH DEAL (USING SAME PIB ID)
+// 🔹 SEARCH DEAL
 const dealRes = await fetch(
   `https://www.zohoapis.in/crm/v2/Deals/search?criteria=(PIB_LEAD_ID:equals:${encodeURIComponent(pib_id)})`,
   { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
@@ -124,6 +124,7 @@ const dealRes = await fetch(
 
 const dealData = await safeParse(dealRes, "DEAL SEARCH");
 
+// 🔥 IMPORTANT FIXES HERE
 const dealPayload = {
   Deal_Name: formFields.fullName,
   Owner: { id: leadOwnerId },
@@ -133,14 +134,18 @@ const dealPayload = {
 
   Payment_Method: paymentMethod,
 
-  Total_Fee: formFields.totalFee,
-  Amount_Paid: formFields.amountPaid,
+  // ✅ Course Hold → NO payment info
+  Total_Fee: paymentMethod === "Course Hold" ? null : formFields.totalFee,
+  Amount_Paid: paymentMethod === "Course Hold" ? null : formFields.amountPaid,
 
   Course_Holding_Amount: holdAmount,
   st_Installment_Amount: firstInstallment,
   nd_Installment_Amount: secondInstallment,
 
-  Payment_Status: "Partial"
+  Payment_Status: paymentMethod === "Course Hold" ? "Hold" : "Partial",
+
+  // ✅ FIX: COPY PIB ID FROM LEAD
+  PIB_LEAD_ID: lead.PIB_LEAD_ID
 };
 
 // 🔹 CREATE / UPDATE DEAL
@@ -173,7 +178,6 @@ if (!dealData.data || dealData.data.length === 0) {
   });
 }
 
-// ✅ FIXED SUCCESS RESPONSE
 return res.status(200).json({
   success: true,
   message: "Enrollment successful"
