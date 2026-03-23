@@ -22,24 +22,27 @@ return res.status(400).json({ message: "Missing pib_id" });
 try {
 
 
-// 🔹 Step 1: Generate fresh access token
-  const tokenResponse = await fetch(
-    "https://accounts.zoho.in/oauth/v2/token",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-        body: new URLSearchParams({
-          refresh_token: process.env.ZOHO_REFRESH_TOKEN,
-          client_id: process.env.ZOHO_CLIENT_ID,
-          client_secret: process.env.ZOHO_CLIENT_SECRET,
-          grant_type: "refresh_token"
-        })
-      }
-    );
+// 🔹 Step 1: Generate Token
+const tokenResponse = await fetch(
+  "https://accounts.zoho.in/oauth/v2/token",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams({
+      refresh_token: process.env.ZOHO_REFRESH_TOKEN,
+      client_id: process.env.ZOHO_CLIENT_ID,
+      client_secret: process.env.ZOHO_CLIENT_SECRET,
+      grant_type: "refresh_token"
+    })
+  }
+);
 
-const tokenData = await tokenResponse.json();
+const tokenText = await tokenResponse.text();
+console.log("TOKEN RESPONSE:", tokenText);
+
+const tokenData = tokenText ? JSON.parse(tokenText) : {};
 
 if (!tokenData.access_token) {
   return res.status(500).json({
@@ -50,19 +53,21 @@ if (!tokenData.access_token) {
 
 const accessToken = tokenData.access_token;
 
-// 🔹 Step 2: Search Lead by PIB_LEAD_ID
+// 🔹 Step 2: Search Lead
 const searchResponse = await fetch(
-  `https://www.zohoapis.in/crm/v2/Leads/search?criteria=(PIB_LEAD_ID:equals:${pib_id})`,
+  `https://www.zohoapis.in/crm/v2/Leads/search?criteria=(PIB_LEAD_ID:equals:${encodeURIComponent(pib_id)})`,
   {
     method: "GET",
     headers: {
       Authorization: `Zoho-oauthtoken ${accessToken}`
     }
   }
-)
-;
+);
 
-const searchData = await searchResponse.json();
+const searchText = await searchResponse.text();
+console.log("LEAD SEARCH RESPONSE:", searchText);
+
+const searchData = searchText ? JSON.parse(searchText) : {};
 
 if (!searchData.data || searchData.data.length === 0) {
   return res.status(404).json({ message: "Lead not found" });
@@ -70,7 +75,7 @@ if (!searchData.data || searchData.data.length === 0) {
 
 const leadId = searchData.data[0].id;
 
-// 🔹 Step 3: Update Lead (REMOVE PAYMENT FIELDS)
+// 🔹 Step 3: Update Lead
 const zohoData = {
   Last_Name: formFields.fullName,
   Email: formFields.email,
@@ -100,7 +105,7 @@ await fetch(
 
 // 🔹 Step 4: Search Deal
 const dealSearchResponse = await fetch(
-  `https://www.zohoapis.in/crm/v2/Deals/search?criteria=(PIB_LEAD_ID:equals:${pib_id})`,
+  `https://www.zohoapis.in/crm/v2/Deals/search?criteria=(PIB_LEAD_ID:equals:${encodeURIComponent(pib_id)})`,
   {
     method: "GET",
     headers: {
@@ -109,30 +114,29 @@ const dealSearchResponse = await fetch(
   }
 );
 
-const dealSearchData = await dealSearchResponse.json();
+const dealText = await dealSearchResponse.text();
+console.log("DEAL SEARCH RESPONSE:", dealText);
 
-// 🔹 Step 5: Deal Payload (CORRECT API NAMES)
+const dealSearchData = dealText ? JSON.parse(dealText) : {};
+
+// 🔹 Step 5: Deal Payload
 const dealPayload = {
   Deal_Name: formFields.fullName,
-
   Pipeline: "Course Holding Pipeline",
   Stage: "Hold Discussion",
-
   Payment_Method: "Course Hold",
-
   Total_Fee: formFields.totalFee,
   Amount_Paid: formFields.amountPaid,
   Course_Holding_Amount: formFields.amountPaid,
-
   Payment_Status: "Partial",
-
   PIB_LEAD_ID: pib_id
 };
 
 // 🔹 Step 6: Create or Update Deal
 if (!dealSearchData.data || dealSearchData.data.length === 0) {
 
-  // CREATE DEAL
+  console.log("CREATING DEAL");
+
   await fetch(
     "https://www.zohoapis.in/crm/v2/Deals",
     {
@@ -149,9 +153,10 @@ if (!dealSearchData.data || dealSearchData.data.length === 0) {
 
 } else {
 
+  console.log("UPDATING DEAL");
+
   const dealId = dealSearchData.data[0].id;
 
-  // UPDATE DEAL
   await fetch(
     `https://www.zohoapis.in/crm/v2/Deals/${dealId}`,
     {
@@ -171,6 +176,7 @@ return res.status(200).json({ message: "Success" });
 
 
 } catch (error) {
+console.error("ERROR:", error);
 return res.status(500).json({ error: error.message });
 }
 }
