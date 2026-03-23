@@ -11,6 +11,22 @@ const { pib_id, ...formFields } = req.body;
 
 if (!pib_id) return res.status(400).json({ message: "Missing pib_id" });
 
+// ✅ SAFE PARSER
+async function safeParse(response, label) {
+const text = await response.text();
+console.log(`🔍 ${label}:`, text);
+
+
+try {
+  return text ? JSON.parse(text) : {};
+} catch (e) {
+  console.error(`❌ JSON Parse Error in ${label}:`, text);
+  return {};
+}
+
+
+}
+
 try {
 
 
@@ -26,7 +42,12 @@ const tokenRes = await fetch("https://accounts.zoho.in/oauth/v2/token", {
   })
 });
 
-const tokenData = JSON.parse(await tokenRes.text());
+const tokenData = await safeParse(tokenRes, "TOKEN");
+
+if (!tokenData.access_token) {
+  return res.status(500).json({ error: "Token failed", details: tokenData });
+}
+
 const accessToken = tokenData.access_token;
 
 // 🔹 SEARCH LEAD
@@ -35,9 +56,11 @@ const leadRes = await fetch(
   { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
 );
 
-const leadData = JSON.parse(await leadRes.text());
+const leadData = await safeParse(leadRes, "LEAD SEARCH");
 
-if (!leadData.data) return res.status(404).json({ message: "Lead not found" });
+if (!leadData.data || leadData.data.length === 0) {
+  return res.status(404).json({ message: "Lead not found" });
+}
 
 const lead = leadData.data[0];
 const leadId = lead.id;
@@ -78,13 +101,11 @@ if (formFields.paymentMethod === "Course Hold") {
   pipeline = "Course Holding Pipeline";
   stage = "Hold Discussion";
   holdAmount = formFields.amountPaid;
-}
-
+} 
 else if (formFields.paymentMethod === "Single Shot") {
   pipeline = "Single Shot Pipeline";
   stage = "Payment Pending";
-}
-
+} 
 else if (formFields.paymentMethod === "Installment") {
   pipeline = "Installments Pipeline";
   stage = "Plan Confirmed";
@@ -97,7 +118,7 @@ const dealRes = await fetch(
   { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
 );
 
-const dealData = JSON.parse(await dealRes.text());
+const dealData = await safeParse(dealRes, "DEAL SEARCH");
 
 const dealPayload = {
   Deal_Name: formFields.fullName,
@@ -121,7 +142,9 @@ const dealPayload = {
 };
 
 // 🔹 CREATE / UPDATE DEAL
-if (!dealData.data) {
+if (!dealData.data || dealData.data.length === 0) {
+
+  console.log("🟢 Creating Deal");
 
   await fetch("https://www.zohoapis.in/crm/v2/Deals", {
     method: "POST",
@@ -133,6 +156,8 @@ if (!dealData.data) {
   });
 
 } else {
+
+  console.log("🟡 Updating Deal");
 
   const dealId = dealData.data[0].id;
 
@@ -150,6 +175,7 @@ return res.status(200).json({ message: "Success" });
 
 
 } catch (err) {
+console.error("🔥 ERROR:", err);
 return res.status(500).json({ error: err.message });
 }
 }
