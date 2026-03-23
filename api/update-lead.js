@@ -1,182 +1,155 @@
 export default async function handler(req, res) {
 
-// ✅ CORS Headers
 res.setHeader("Access-Control-Allow-Origin", "https://enroll.proitbridge.com");
 res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
 res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-if (req.method === "OPTIONS") {
-return res.status(200).end();
-}
-
-if (req.method !== "POST") {
-return res.status(405).json({ message: "Method not allowed" });
-}
+if (req.method === "OPTIONS") return res.status(200).end();
+if (req.method !== "POST") return res.status(405).json({ message: "Method not allowed" });
 
 const { pib_id, ...formFields } = req.body;
 
-if (!pib_id) {
-return res.status(400).json({ message: "Missing pib_id" });
-}
+if (!pib_id) return res.status(400).json({ message: "Missing pib_id" });
 
 try {
 
 
-// 🔹 Step 1: Generate Token
-const tokenResponse = await fetch(
-  "https://accounts.zoho.in/oauth/v2/token",
-  {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: new URLSearchParams({
-      refresh_token: process.env.ZOHO_REFRESH_TOKEN,
-      client_id: process.env.ZOHO_CLIENT_ID,
-      client_secret: process.env.ZOHO_CLIENT_SECRET,
-      grant_type: "refresh_token"
-    })
-  }
-);
+// 🔹 TOKEN
+const tokenRes = await fetch("https://accounts.zoho.in/oauth/v2/token", {
+  method: "POST",
+  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  body: new URLSearchParams({
+    refresh_token: process.env.ZOHO_REFRESH_TOKEN,
+    client_id: process.env.ZOHO_CLIENT_ID,
+    client_secret: process.env.ZOHO_CLIENT_SECRET,
+    grant_type: "refresh_token"
+  })
+});
 
-const tokenText = await tokenResponse.text();
-console.log("TOKEN RESPONSE:", tokenText);
-
-const tokenData = tokenText ? JSON.parse(tokenText) : {};
-
-if (!tokenData.access_token) {
-  return res.status(500).json({
-    error: "Failed to generate access token",
-    details: tokenData
-  });
-}
-
+const tokenData = JSON.parse(await tokenRes.text());
 const accessToken = tokenData.access_token;
 
-// 🔹 Step 2: Search Lead
-const searchResponse = await fetch(
+// 🔹 SEARCH LEAD
+const leadRes = await fetch(
   `https://www.zohoapis.in/crm/v2/Leads/search?criteria=(PIB_LEAD_ID:equals:${encodeURIComponent(pib_id)})`,
-  {
-    method: "GET",
-    headers: {
-      Authorization: `Zoho-oauthtoken ${accessToken}`
-    }
-  }
+  { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
 );
 
-const searchText = await searchResponse.text();
-console.log("LEAD SEARCH RESPONSE:", searchText);
+const leadData = JSON.parse(await leadRes.text());
 
-const searchData = searchText ? JSON.parse(searchText) : {};
+if (!leadData.data) return res.status(404).json({ message: "Lead not found" });
 
-if (!searchData.data || searchData.data.length === 0) {
-  return res.status(404).json({ message: "Lead not found" });
+const lead = leadData.data[0];
+const leadId = lead.id;
+const leadOwnerId = lead.Owner.id;
+
+// 🔹 UPDATE LEAD
+await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
+  method: "PUT",
+  headers: {
+    Authorization: `Zoho-oauthtoken ${accessToken}`,
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    data: [{
+      Last_Name: formFields.fullName,
+      Email: formFields.email,
+      Mobile: formFields.mobile,
+      Country: formFields.country,
+      Street: formFields.address,
+      Course_Name: formFields.courseName,
+      Course_Type: formFields.courseType,
+      Lecture_Language: formFields.lectureLanguage,
+      Course_Start_Date: formFields.courseStartDate,
+      Enrollment_Status: "Enrollment Form Submitted"
+    }]
+  })
+});
+
+// 🔹 PAYMENT PLAN LOGIC
+let pipeline = "";
+let stage = "";
+
+let holdAmount = null;
+let firstInstallment = null;
+let secondInstallment = null;
+
+if (formFields.paymentMethod === "Course Hold") {
+  pipeline = "Course Holding Pipeline";
+  stage = "Hold Discussion";
+  holdAmount = formFields.amountPaid;
 }
 
-const leadId = searchData.data[0].id;
+else if (formFields.paymentMethod === "Single Shot") {
+  pipeline = "Single Shot Pipeline";
+  stage = "Payment Pending";
+}
 
-// 🔹 Step 3: Update Lead
-const zohoData = {
-  Last_Name: formFields.fullName,
-  Email: formFields.email,
-  Mobile: formFields.mobile,
-  Country: formFields.country,
-  Street: formFields.address,
-  Course_Name: formFields.courseName,
-  Course_Type: formFields.courseType,
-  Lecture_Language: formFields.lectureLanguage,
-  Course_Start_Date: formFields.courseStartDate,
-  Enrollment_Status: "Enrollment Form Submitted"
+else if (formFields.paymentMethod === "Installment") {
+  pipeline = "Installments Pipeline";
+  stage = "Plan Confirmed";
+  firstInstallment = formFields.amountPaid;
+}
+
+// 🔹 SEARCH DEAL
+const dealRes = await fetch(
+  `https://www.zohoapis.in/crm/v2/Deals/search?criteria=(PIB_LEAD_ID:equals:${encodeURIComponent(pib_id)})`,
+  { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
+);
+
+const dealData = JSON.parse(await dealRes.text());
+
+const dealPayload = {
+  Deal_Name: formFields.fullName,
+  Owner: { id: leadOwnerId },
+
+  Pipeline: pipeline,
+  Stage: stage,
+
+  Payment_Method: formFields.paymentMethod,
+
+  Total_Fee: formFields.totalFee,
+  Amount_Paid: formFields.amountPaid,
+
+  Course_Holding_Amount: holdAmount,
+  st_Installment_Amount: firstInstallment,
+  nd_Installment_Amount: secondInstallment,
+
+  Payment_Status: "Partial",
+
+  PIB_LEAD_ID: pib_id
 };
 
-await fetch(
-  `https://www.zohoapis.in/crm/v2/Leads/${leadId}`,
-  {
+// 🔹 CREATE / UPDATE DEAL
+if (!dealData.data) {
+
+  await fetch("https://www.zohoapis.in/crm/v2/Deals", {
+    method: "POST",
+    headers: {
+      Authorization: `Zoho-oauthtoken ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ data: [dealPayload] })
+  });
+
+} else {
+
+  const dealId = dealData.data[0].id;
+
+  await fetch(`https://www.zohoapis.in/crm/v2/Deals/${dealId}`, {
     method: "PUT",
     headers: {
       Authorization: `Zoho-oauthtoken ${accessToken}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      data: [zohoData]
-    })
-  }
-);
-
-// 🔹 Step 4: Search Deal
-const dealSearchResponse = await fetch(
-  `https://www.zohoapis.in/crm/v2/Deals/search?criteria=(PIB_LEAD_ID:equals:${encodeURIComponent(pib_id)})`,
-  {
-    method: "GET",
-    headers: {
-      Authorization: `Zoho-oauthtoken ${accessToken}`
-    }
-  }
-);
-
-const dealText = await dealSearchResponse.text();
-console.log("DEAL SEARCH RESPONSE:", dealText);
-
-const dealSearchData = dealText ? JSON.parse(dealText) : {};
-
-// 🔹 Step 5: Deal Payload
-const dealPayload = {
-  Deal_Name: formFields.fullName,
-  Pipeline: "Course Holding Pipeline",
-  Stage: "Hold Discussion",
-  Payment_Method: "Course Hold",
-  Total_Fee: formFields.totalFee,
-  Amount_Paid: formFields.amountPaid,
-  Course_Holding_Amount: formFields.amountPaid,
-  Payment_Status: "Partial",
-  PIB_LEAD_ID: pib_id
-};
-
-// 🔹 Step 6: Create or Update Deal
-if (!dealSearchData.data || dealSearchData.data.length === 0) {
-
-  console.log("CREATING DEAL");
-
-  await fetch(
-    "https://www.zohoapis.in/crm/v2/Deals",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Zoho-oauthtoken ${accessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        data: [dealPayload]
-      })
-    }
-  );
-
-} else {
-
-  console.log("UPDATING DEAL");
-
-  const dealId = dealSearchData.data[0].id;
-
-  await fetch(
-    `https://www.zohoapis.in/crm/v2/Deals/${dealId}`,
-    {
-      method: "PUT",
-      headers: {
-        Authorization: `Zoho-oauthtoken ${accessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        data: [dealPayload]
-      })
-    }
-  );
+    body: JSON.stringify({ data: [dealPayload] })
+  });
 }
 
 return res.status(200).json({ message: "Success" });
 
 
-} catch (error) {
-console.error("ERROR:", error);
-return res.status(500).json({ error: error.message });
+} catch (err) {
+return res.status(500).json({ error: err.message });
 }
 }
