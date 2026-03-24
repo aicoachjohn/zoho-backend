@@ -143,7 +143,8 @@ const dealPayload = {
 
   Payment_Status: paymentMethod === "Course Hold" ? "Hold" : "Partial",
 
-  
+  Country: formFields.country,
+  Street: formFields.address,
   Course_Name: formFields.courseName,
   Course_Type: formFields.courseType,
   Lecture_Language: formFields.lectureLanguage,
