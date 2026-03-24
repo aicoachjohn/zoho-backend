@@ -11,26 +11,22 @@ const { pib_id, ...formFields } = req.body;
 
 if (!pib_id) return res.status(400).json({ message: "Missing pib_id" });
 
-// ✅ SAFE PARSER
+
 async function safeParse(response, label) {
-const text = await response.text();
-console.log(`🔍 ${label}:`, text);
+  const text = await response.text();
+  console.log(`🔍 ${label}:`, text);
 
-
-try {
-  return text ? JSON.parse(text) : {};
-} catch (e) {
-  console.error(`❌ JSON Parse Error in ${label}:`, text);
-  return {};
-}
-
-
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch (e) {
+    console.error(`❌ JSON Parse Error in ${label}:`, text);
+    return {};
+  }
 }
 
 try {
 
 
-// 🔹 TOKEN
 const tokenRes = await fetch("https://accounts.zoho.in/oauth/v2/token", {
   method: "POST",
   headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -50,7 +46,7 @@ if (!tokenData.access_token) {
 
 const accessToken = tokenData.access_token;
 
-// 🔹 SEARCH LEAD
+
 const leadRes = await fetch(
   `https://www.zohoapis.in/crm/v2/Leads/search?criteria=(PIB_LEAD_ID:equals:${encodeURIComponent(pib_id)})`,
   { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
@@ -66,7 +62,7 @@ const lead = leadData.data[0];
 const leadId = lead.id;
 const leadOwnerId = lead.Owner.id;
 
-// 🔹 UPDATE LEAD
+
 await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
   method: "PUT",
   headers: {
@@ -98,6 +94,7 @@ let firstInstallment = null;
 let secondInstallment = null;
 
 const paymentMethod = formFields.paymentMethod?.trim();
+const paymentPlan = formFields.paymentPlan?.trim(); 
 
 if (paymentMethod === "Course Hold") {
   pipeline = "Course Holding Pipeline";
@@ -116,7 +113,7 @@ else if (paymentMethod === "Installment") {
   firstInstallment = formFields.amountPaid;
 }
 
-// 🔹 SEARCH DEAL
+
 const dealRes = await fetch(
   `https://www.zohoapis.in/crm/v2/Deals/search?criteria=(PIB_LEAD_ID:equals:${encodeURIComponent(pib_id)})`,
   { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
@@ -124,7 +121,7 @@ const dealRes = await fetch(
 
 const dealData = await safeParse(dealRes, "DEAL SEARCH");
 
-// 🔥 IMPORTANT FIXES HERE
+
 const dealPayload = {
   Deal_Name: formFields.fullName,
   Owner: { id: leadOwnerId },
@@ -133,22 +130,30 @@ const dealPayload = {
   Stage: stage,
 
   Payment_Method: paymentMethod,
+  Payment_Plan: paymentPlan, 
 
-  // ✅ Course Hold → NO payment info
-  Total_Fee: paymentMethod === "Course Hold" ? null : formFields.totalFee,
-  Amount_Paid: paymentMethod === "Course Hold" ? null : formFields.amountPaid,
+  
+  Total_Fee: formFields.totalFee,
+  Amount_Paid: formFields.amountPaid,
 
+  
   Course_Holding_Amount: holdAmount,
   st_Installment_Amount: firstInstallment,
   nd_Installment_Amount: secondInstallment,
 
   Payment_Status: paymentMethod === "Course Hold" ? "Hold" : "Partial",
 
-  // ✅ FIX: COPY PIB ID FROM LEAD
+  
+  Course_Name: formFields.courseName,
+  Course_Type: formFields.courseType,
+  Lecture_Language: formFields.lectureLanguage,
+  Course_Start_Date: formFields.courseStartDate,
+
+  
   PIB_LEAD_ID: lead.PIB_LEAD_ID
 };
 
-// 🔹 CREATE / UPDATE DEAL
+
 if (!dealData.data || dealData.data.length === 0) {
 
   console.log("🟢 Creating Deal");
@@ -182,7 +187,6 @@ return res.status(200).json({
   success: true,
   message: "Enrollment successful"
 });
-
 
 } catch (err) {
 console.error("🔥 ERROR:", err);
