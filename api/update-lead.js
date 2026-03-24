@@ -132,25 +132,24 @@ const dealPayload = {
   Payment_Method: paymentMethod,
   Payment_Plan: paymentPlan, 
 
-  
   Total_Fee: formFields.totalFee,
   Amount_Paid: formFields.amountPaid,
 
-  
   Course_Holding_Amount: holdAmount,
   st_Installment_Amount: firstInstallment,
   nd_Installment_Amount: secondInstallment,
 
   Payment_Status: paymentMethod === "Course Hold" ? "Hold" : "Partial",
 
-  Country: formFields.country,
-  Street: formFields.address,
   Course_Name: formFields.courseName,
   Course_Type: formFields.courseType,
   Lecture_Language: formFields.lectureLanguage,
   Course_Start_Date: formFields.courseStartDate,
 
   
+  Country: formFields.country,
+  Street: formFields.address,
+
   PIB_LEAD_ID: lead.PIB_LEAD_ID
 };
 
