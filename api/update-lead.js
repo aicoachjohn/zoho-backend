@@ -26,7 +26,6 @@ async function safeParse(response, label) {
 
 try {
 
-
 const tokenRes = await fetch("https://accounts.zoho.in/oauth/v2/token", {
   method: "POST",
   headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -139,16 +138,25 @@ const dealPayload = {
   st_Installment_Amount: firstInstallment,
   nd_Installment_Amount: secondInstallment,
 
-  Payment_Status: paymentMethod === "Course Hold" ? "Hold" : "Partial",
+  // ✅ UPDATED LOGIC HERE
+  Payment_Status:
+    paymentMethod === "Course Hold"
+      ? "Hold"
+      : paymentMethod === "Single Shot"
+      ? "Completed"
+      : "Partial",
 
   Course_Name: formFields.courseName,
   Course_Type: formFields.courseType,
   Lecture_Language: formFields.lectureLanguage,
   Course_Start_Date: formFields.courseStartDate,
 
-  
   Country: formFields.country,
   Street: formFields.address,
+
+  // ✅ NEW FIELDS ADDED
+  Lead_Source: lead.Lead_Source,
+  Service_Interested_In: lead.Service_Interested_In,
 
   PIB_LEAD_ID: lead.PIB_LEAD_ID
 };
