@@ -74,7 +74,7 @@ await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
       Email: formFields.email,
       Mobile: formFields.mobile,
       Country: formFields.country,
-      Street: formFields.address,
+      Complete_Address: formFields.address, // ✅ CHANGED HERE
       Course_Name: formFields.courseName,
       Course_Type: formFields.courseType,
       Lecture_Language: formFields.lectureLanguage,
@@ -138,7 +138,6 @@ const dealPayload = {
   st_Installment_Amount: firstInstallment,
   nd_Installment_Amount: secondInstallment,
 
-  // ✅ UPDATED LOGIC HERE
   Payment_Status:
     paymentMethod === "Course Hold"
       ? "Hold"
@@ -152,9 +151,8 @@ const dealPayload = {
   Course_Start_Date: formFields.courseStartDate,
 
   Country: formFields.country,
-  Street: formFields.address,
+  Complete_Address: formFields.address, // ✅ CHANGED HERE
 
-  // ✅ NEW FIELDS ADDED
   Lead_Source: lead.Lead_Source,
   Service_Interested_In: lead.Service_Interested_In,
 
