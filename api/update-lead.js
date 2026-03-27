@@ -91,13 +91,8 @@ let stage = "";
 const paymentMethod = formFields.paymentMethod?.trim();
 const paymentPlan = formFields.paymentPlan?.trim(); 
 
-// ✅ FIXED LOGIC HERE
-if (paymentMethod === "Course Hold") {
-  pipeline = "Course Holding Pipeline";
-  stage = "Hold Discussion";
-}
-
-else if (paymentPlan === "Single Shot") {
+// ✅ UPDATED LOGIC ONLY HERE
+if (paymentPlan === "Single Shot") {
   pipeline = "Single Shot Pipeline";
   stage = "Payment Pending";
 }
@@ -105,6 +100,11 @@ else if (paymentPlan === "Single Shot") {
 else if (paymentPlan === "Installment") {
   pipeline = "Installments Pipeline";
   stage = "Plan Confirmed";
+}
+
+else if (paymentMethod === "Course Hold") {
+  pipeline = "Course Holding Pipeline";
+  stage = "Hold Discussion";
 }
 
 
