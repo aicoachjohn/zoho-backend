@@ -74,7 +74,7 @@ await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
       Email: formFields.email,
       Mobile: formFields.mobile,
       Country: formFields.country,
-      Complete_Address: formFields.address, // ✅ CHANGED HERE
+      Complete_Address: formFields.address,
       Course_Name: formFields.courseName,
       Course_Type: formFields.courseType,
       Lecture_Language: formFields.lectureLanguage,
@@ -88,17 +88,12 @@ await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
 let pipeline = "";
 let stage = "";
 
-let holdAmount = null;
-let firstInstallment = null;
-let secondInstallment = null;
-
 const paymentMethod = formFields.paymentMethod?.trim();
 const paymentPlan = formFields.paymentPlan?.trim(); 
 
 if (paymentMethod === "Course Hold") {
   pipeline = "Course Holding Pipeline";
   stage = "Hold Discussion";
-  holdAmount = formFields.amountPaid;
 }
 
 else if (paymentMethod === "Single Shot") {
@@ -109,7 +104,6 @@ else if (paymentMethod === "Single Shot") {
 else if (paymentMethod === "Installment") {
   pipeline = "Installments Pipeline";
   stage = "Plan Confirmed";
-  firstInstallment = formFields.amountPaid;
 }
 
 
@@ -134,10 +128,6 @@ const dealPayload = {
   Total_Fee: formFields.totalFee,
   Amount_Paid: formFields.amountPaid,
 
-  Course_Holding_Amount: holdAmount,
-  st_Installment_Amount: firstInstallment,
-  nd_Installment_Amount: secondInstallment,
-
   Payment_Status:
     paymentMethod === "Course Hold"
       ? "Hold"
@@ -151,7 +141,7 @@ const dealPayload = {
   Course_Start_Date: formFields.courseStartDate,
 
   Country: formFields.country,
-  Complete_Address: formFields.address, // ✅ CHANGED HERE
+  Complete_Address: formFields.address,
 
   Lead_Source: lead.Lead_Source,
   Service_Interested_In: lead.Service_Interested_In,
