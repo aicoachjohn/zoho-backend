@@ -92,21 +92,23 @@ const paymentMethod = formFields.paymentMethod?.trim();
 const paymentPlan = formFields.paymentPlan?.trim(); 
 
 const method = paymentMethod?.toLowerCase();
-const plan = paymentPlan?.toLowerCase();
 
-if (method === "single shot" || plan === "single shot") {
+// ✅ PRIORITY 1: Course Hold (always override)
+if (method === "course hold") {
+  pipeline = "Course Holding Pipeline";
+  stage = "Hold Discussion";
+}
+
+// ✅ PRIORITY 2: Single Shot
+else if (method === "single shot") {
   pipeline = "Single Shot Pipeline";
   stage = "Payment Pending";
 }
 
-else if (method === "installment" || plan === "installment") {
+// ✅ PRIORITY 3: Installment
+else if (method === "installment") {
   pipeline = "Installments Pipeline";
   stage = "Plan Confirmed";
-}
-
-else if (method === "course hold") {
-  pipeline = "Course Holding Pipeline";
-  stage = "Hold Discussion";
 }
 
 
