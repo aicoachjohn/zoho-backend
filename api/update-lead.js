@@ -91,17 +91,18 @@ let stage = "";
 const paymentMethod = formFields.paymentMethod?.trim();
 const paymentPlan = formFields.paymentPlan?.trim(); 
 
+// ✅ FIXED LOGIC HERE
 if (paymentMethod === "Course Hold") {
   pipeline = "Course Holding Pipeline";
   stage = "Hold Discussion";
 }
 
-else if (paymentMethod === "Single Shot") {
+else if (paymentPlan === "Single Shot") {
   pipeline = "Single Shot Pipeline";
   stage = "Payment Pending";
 }
 
-else if (paymentMethod === "Installment") {
+else if (paymentPlan === "Installment") {
   pipeline = "Installments Pipeline";
   stage = "Plan Confirmed";
 }
