@@ -93,7 +93,7 @@ const paymentPlan = formFields.paymentPlan?.trim();
 
 const method = paymentMethod?.toLowerCase();
 
-// ✅ PRIORITY 1: Course Hold (always override)
+// ✅ PRIORITY 1: Course Hold 
 if (method === "course hold") {
   pipeline = "Course Holding Pipeline";
   stage = "Hold Discussion";
