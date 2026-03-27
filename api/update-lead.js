@@ -62,6 +62,7 @@ const leadId = lead.id;
 const leadOwnerId = lead.Owner.id;
 
 
+// 🔹 UPDATE LEAD
 await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
   method: "PUT",
   headers: {
@@ -83,6 +84,51 @@ await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
     }]
   })
 });
+
+
+// 🔹 CHECK / CREATE CONTACT (ADDED)
+const contactRes = await fetch(
+  `https://www.zohoapis.in/crm/v2/Contacts/search?criteria=(Email:equals:${encodeURIComponent(formFields.email)})`,
+  { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
+);
+
+const contactData = await safeParse(contactRes, "CONTACT SEARCH");
+
+let contactId = null;
+
+if (!contactData.data || contactData.data.length === 0) {
+
+  console.log("🟢 Creating Contact");
+
+  const createContactRes = await fetch("https://www.zohoapis.in/crm/v2/Contacts", {
+    method: "POST",
+    headers: {
+      Authorization: `Zoho-oauthtoken ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      data: [{
+        Last_Name: formFields.fullName,
+        Email: formFields.email,
+        Mobile: formFields.mobile,
+        Country: formFields.country,
+        Complete_Address: formFields.address,
+        Lead_Source: lead.Lead_Source,
+        Service_Interested_In: lead.Service_Interested_In,
+        PIB_LEAD_ID: lead.PIB_LEAD_ID // ✅ ADDED
+      }]
+    })
+  });
+
+  const newContact = await safeParse(createContactRes, "CREATE CONTACT");
+  contactId = newContact.data?.[0]?.details?.id;
+
+} else {
+
+  console.log("🟡 Contact already exists");
+  contactId = contactData.data[0].id;
+}
+
 
 // 🔹 PAYMENT PLAN LOGIC
 let pipeline = "";
@@ -123,6 +169,8 @@ const dealData = await safeParse(dealRes, "DEAL SEARCH");
 const dealPayload = {
   Deal_Name: formFields.fullName,
   Owner: { id: leadOwnerId },
+
+  Contact_Name: { id: contactId }, // ✅ ADDED LINK
 
   Pipeline: pipeline,
   Stage: stage,
