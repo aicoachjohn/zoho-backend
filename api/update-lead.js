@@ -114,6 +114,7 @@ if (!contactData.data || contactData.data.length === 0) {
         Country: formFields.country,
         Complete_Address: formFields.address,
         Lead_Source: lead.Lead_Source,
+        Lead_Status:lead.Lead_Status,
         Service_Interested_In: lead.Service_Interested_In,
         PIB_LEAD_ID: lead.PIB_LEAD_ID
       }]
