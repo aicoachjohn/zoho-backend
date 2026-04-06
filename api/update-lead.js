@@ -67,12 +67,14 @@ const leadData = await safeParse(leadRes, "LEAD SEARCH");
 
 let lead = null;
 let leadOwnerId = null;
+let leadId = null; // ✅ FIX ADDED
 
 if (leadData.data && leadData.data.length > 0) {
 
   console.log("✅ Lead found in Leads");
   lead = leadData.data[0];
   leadOwnerId = lead.Owner.id;
+  leadId = lead.id; // ✅ FIX ADDED
 
 } else {
 
@@ -96,36 +98,40 @@ if (leadData.data && leadData.data.length > 0) {
   // simulate lead object
   lead = contact;
   leadOwnerId = contact.Owner?.id;
+
+  // ❌ DO NOT set leadId here (it's a contact)
 }
 
 
-// 🔹 UPDATE LEAD
-await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
-  method: "PUT",
-  headers: {
-    Authorization: `Zoho-oauthtoken ${accessToken}`,
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    data: [{
-      Last_Name: formFields.fullName,
-      Email: formFields.email,
-      Mobile: formFields.mobile,
+// 🔹 UPDATE LEAD (only if leadId exists)
+if (leadId) {
+  await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Zoho-oauthtoken ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      data: [{
+        Last_Name: formFields.fullName,
+        Email: formFields.email,
+        Mobile: formFields.mobile,
 
-      Complete_Address: fullAddress,
-      City_1: formFields.city,
-      State_1: formFields.state,
-      Country_1: formFields.addressCountry || formFields.country,
-      Pincode: formFields.pincode,
+        Complete_Address: fullAddress,
+        City_1: formFields.city,
+        State_1: formFields.state,
+        Country_1: formFields.addressCountry || formFields.country,
+        Pincode: formFields.pincode,
 
-      Course_Name: formFields.courseName,
-      Course_Type: formFields.courseType,
-      Lecture_Language: formFields.lectureLanguage,
-      Course_Start_Date: formFields.courseStartDate,
-      Enrollment_Status: "Enrollment Form Submitted"
-    }]
-  })
-});
+        Course_Name: formFields.courseName,
+        Course_Type: formFields.courseType,
+        Lecture_Language: formFields.lectureLanguage,
+        Course_Start_Date: formFields.courseStartDate,
+        Enrollment_Status: "Enrollment Form Submitted"
+      }]
+    })
+  });
+}
 
 
 // 🔹 CHECK / CREATE CONTACT
