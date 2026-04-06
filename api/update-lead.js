@@ -65,13 +65,38 @@ const leadRes = await fetch(
 
 const leadData = await safeParse(leadRes, "LEAD SEARCH");
 
-if (!leadData.data || leadData.data.length === 0) {
-  return res.status(404).json({ message: "Lead not found" });
-}
+let lead = null;
+let leadOwnerId = null;
 
-const lead = leadData.data[0];
-const leadId = lead.id;
-const leadOwnerId = lead.Owner.id;
+if (leadData.data && leadData.data.length > 0) {
+
+  console.log("✅ Lead found in Leads");
+  lead = leadData.data[0];
+  leadOwnerId = lead.Owner.id;
+
+} else {
+
+  console.log("⚠️ Lead not in Leads, checking Contacts...");
+
+  const contactResFallback = await fetch(
+    `https://www.zohoapis.in/crm/v2/Contacts/search?criteria=(PIB_LEAD_ID:equals:"${pib_id_clean}")`,
+    { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
+  );
+
+  const contactFallbackData = await safeParse(contactResFallback, "CONTACT SEARCH FALLBACK");
+
+  if (!contactFallbackData.data || contactFallbackData.data.length === 0) {
+    return res.status(404).json({ message: "Lead not found in Leads or Contacts" });
+  }
+
+  console.log("✅ Found in Contacts (converted lead)");
+
+  const contact = contactFallbackData.data[0];
+
+  // simulate lead object
+  lead = contact;
+  leadOwnerId = contact.Owner?.id;
+}
 
 
 // 🔹 UPDATE LEAD
