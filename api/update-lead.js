@@ -67,14 +67,14 @@ const leadData = await safeParse(leadRes, "LEAD SEARCH");
 
 let lead = null;
 let leadOwnerId = null;
-let leadId = null; // ✅ FIX ADDED
+let leadId = null; 
 
 if (leadData.data && leadData.data.length > 0) {
 
   console.log("✅ Lead found in Leads");
   lead = leadData.data[0];
   leadOwnerId = lead.Owner.id;
-  leadId = lead.id; // ✅ FIX ADDED
+  leadId = lead.id; 
 
 } else {
 
@@ -99,7 +99,7 @@ if (leadData.data && leadData.data.length > 0) {
   lead = contact;
   leadOwnerId = contact.Owner?.id;
 
-  // ❌ DO NOT set leadId here (it's a contact)
+  
 }
 
 
