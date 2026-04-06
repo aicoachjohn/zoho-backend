@@ -11,7 +11,6 @@ const { pib_id, ...formFields } = req.body;
 
 if (!pib_id) return res.status(400).json({ message: "Missing pib_id" });
 
-
 async function safeParse(response, label) {
   const text = await response.text();
   console.log(`🔍 ${label}:`, text);
@@ -45,9 +44,21 @@ if (!tokenData.access_token) {
 
 const accessToken = tokenData.access_token;
 
+// ✅ CLEAN PIB ID
+const pib_id_clean = pib_id.trim();
 
+// ✅ NEW ADDRESS LOGIC
+const fullAddress = [
+  formFields.address,
+  formFields.city,
+  formFields.state,
+  formFields.pincode,
+  formFields.addressCountry
+].filter(Boolean).join(", ");
+
+// 🔹 SEARCH LEAD
 const leadRes = await fetch(
-  `https://www.zohoapis.in/crm/v2/Leads/search?criteria=(PIB_LEAD_ID:equals:"${pib_id}")`,
+  `https://www.zohoapis.in/crm/v2/Leads/search?criteria=(PIB_LEAD_ID:equals:"${pib_id_clean}")`,
   { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
 );
 
@@ -74,8 +85,13 @@ await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
       Last_Name: formFields.fullName,
       Email: formFields.email,
       Mobile: formFields.mobile,
-      Country: formFields.country,
-      Complete_Address: formFields.address,
+
+      Country: formFields.addressCountry || formFields.country,
+      Complete_Address: fullAddress,
+      City: formFields.city,
+      State: formFields.state,
+      Zip_Code: formFields.pincode,
+
       Course_Name: formFields.courseName,
       Course_Type: formFields.courseType,
       Lecture_Language: formFields.lectureLanguage,
@@ -86,7 +102,7 @@ await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
 });
 
 
-// 🔹 CHECK / CREATE CONTACT (ADDED)
+// 🔹 CHECK / CREATE CONTACT
 const contactRes = await fetch(
   `https://www.zohoapis.in/crm/v2/Contacts/search?criteria=(Email:equals:${encodeURIComponent(formFields.email)})`,
   { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
@@ -111,10 +127,15 @@ if (!contactData.data || contactData.data.length === 0) {
         Last_Name: formFields.fullName,
         Email: formFields.email,
         Mobile: formFields.mobile,
-        Country: formFields.country,
-        Complete_Address: formFields.address,
+
+        Country: formFields.addressCountry || formFields.country,
+        Complete_Address: fullAddress,
+        City: formFields.city,
+        State: formFields.state,
+        Zip_Code: formFields.pincode,
+
         Lead_Source: lead.Lead_Source,
-        Lead_Status:lead.Lead_Status,
+        Lead_Status: lead.Lead_Status,
         Service_Interested_In: lead.Service_Interested_In,
         PIB_LEAD_ID: lead.PIB_LEAD_ID
       }]
@@ -140,38 +161,35 @@ const paymentPlan = formFields.paymentPlan?.trim();
 
 const method = paymentMethod?.toLowerCase();
 
-// ✅ PRIORITY 1: Course Hold 
 if (method === "course hold") {
   pipeline = "Course Holding Pipeline";
   stage = "Hold Discussion";
 }
-
-// ✅ PRIORITY 2: Single Shot
 else if (method === "single shot") {
   pipeline = "Single Shot Pipeline";
   stage = "Payment Pending";
 }
-
-// ✅ PRIORITY 3: Installment
 else if (method === "installment") {
   pipeline = "Installments Pipeline";
   stage = "Plan Confirmed";
 }
 
 
+// 🔹 SEARCH DEAL (FIXED)
 const dealRes = await fetch(
-  `https://www.zohoapis.in/crm/v2/Deals/search?criteria=(PIB_LEAD_ID:equals:${encodeURIComponent(pib_id)})`,
+  `https://www.zohoapis.in/crm/v2/Deals/search?criteria=(PIB_LEAD_ID:equals:"${pib_id_clean}")`,
   { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
 );
 
 const dealData = await safeParse(dealRes, "DEAL SEARCH");
 
 
+// 🔹 DEAL PAYLOAD
 const dealPayload = {
   Deal_Name: formFields.fullName,
   Owner: { id: leadOwnerId },
 
-  Contact_Name: { id: contactId }, // ✅ ADDED LINK
+  Contact_Name: { id: contactId },
 
   Pipeline: pipeline,
   Stage: stage,
@@ -194,8 +212,11 @@ const dealPayload = {
   Lecture_Language: formFields.lectureLanguage,
   Course_Start_Date: formFields.courseStartDate,
 
-  Country: formFields.country,
-  Complete_Address: formFields.address,
+  Country: formFields.addressCountry || formFields.country,
+  Complete_Address: fullAddress,
+  City: formFields.city,
+  State: formFields.state,
+  Zip_Code: formFields.pincode,
 
   Lead_Source: lead.Lead_Source,
   Service_Interested_In: lead.Service_Interested_In,
