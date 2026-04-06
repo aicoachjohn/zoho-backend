@@ -47,7 +47,7 @@ const accessToken = tokenData.access_token;
 
 
 const leadRes = await fetch(
-  `https://www.zohoapis.in/crm/v2/Leads/search?criteria=(PIB_LEAD_ID:equals:${encodeURIComponent(pib_id)})`,
+  `https://www.zohoapis.in/crm/v2/Leads/search?criteria=(PIB_LEAD_ID:equals:"${pib_id}")`,
   { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
 );
 
