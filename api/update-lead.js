@@ -47,7 +47,7 @@ const accessToken = tokenData.access_token;
 // ✅ CLEAN PIB ID
 const pib_id_clean = pib_id.trim();
 
-// ✅ NEW ADDRESS LOGIC
+// ✅ ADDRESS BUILDER
 const fullAddress = [
   formFields.address,
   formFields.city,
@@ -86,11 +86,11 @@ await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
       Email: formFields.email,
       Mobile: formFields.mobile,
 
-      Country: formFields.addressCountry || formFields.country,
       Complete_Address: fullAddress,
-      City: formFields.city,
-      State: formFields.state,
-      Zip_Code: formFields.pincode,
+      City_1: formFields.city,
+      State_1: formFields.state,
+      Country_1: formFields.addressCountry || formFields.country,
+      Pincode: formFields.pincode,
 
       Course_Name: formFields.courseName,
       Course_Type: formFields.courseType,
@@ -128,11 +128,11 @@ if (!contactData.data || contactData.data.length === 0) {
         Email: formFields.email,
         Mobile: formFields.mobile,
 
-        Country: formFields.addressCountry || formFields.country,
         Complete_Address: fullAddress,
-        City: formFields.city,
-        State: formFields.state,
-        Zip_Code: formFields.pincode,
+        City_1: formFields.city,
+        State_1: formFields.state,
+        Country_1: formFields.addressCountry || formFields.country,
+        Pincode: formFields.pincode,
 
         Lead_Source: lead.Lead_Source,
         Lead_Status: lead.Lead_Status,
@@ -212,11 +212,11 @@ const dealPayload = {
   Lecture_Language: formFields.lectureLanguage,
   Course_Start_Date: formFields.courseStartDate,
 
-  Country: formFields.addressCountry || formFields.country,
   Complete_Address: fullAddress,
-  City: formFields.city,
-  State: formFields.state,
-  Zip_Code: formFields.pincode,
+  City_1: formFields.city,
+  State_1: formFields.state,
+  Country_1: formFields.addressCountry || formFields.country,
+  Pincode: formFields.pincode,
 
   Lead_Source: lead.Lead_Source,
   Service_Interested_In: lead.Service_Interested_In,
