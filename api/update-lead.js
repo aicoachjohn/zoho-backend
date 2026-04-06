@@ -44,8 +44,9 @@ if (!tokenData.access_token) {
 
 const accessToken = tokenData.access_token;
 
-// ✅ CLEAN PIB ID
-const pib_id_clean = pib_id.trim();
+const pib_id_clean = pib_id
+  .trim()
+  .replace(/\s*-\s*/g, "-");
 
 // ✅ ADDRESS BUILDER
 const fullAddress = [
