@@ -171,8 +171,8 @@ if (!contactData.data || contactData.data.length === 0) {
         Lecture_Language: formFields.lectureLanguage,
         Course_Start_Date: formFields.courseStartDate,
 
-        Payment_Method:paymentMethod,
-        Payment_Plan:paymentPlan,
+        Payment_Method: formFields.paymentMethod,
+        Payment_Plan: formFields.paymentPlan,
 
         Lead_Source: lead.Lead_Source,
         Lead_Status: lead.Lead_Status,
@@ -214,8 +214,8 @@ if (!contactData.data || contactData.data.length === 0) {
       Lecture_Language: formFields.lectureLanguage,
       Course_Start_Date: formFields.courseStartDate,
 
-      Payment_Method:paymentMethod,
-      Payment_Plan:paymentPlan
+      Payment_Method: formFields.paymentMethod,
+      Payment_Plan: formFields.paymentPlan
     }]
   })
 });
