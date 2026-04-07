@@ -115,7 +115,7 @@ if (leadId) {
       data: [{
         Last_Name: formFields.fullName,
         Email: formFields.email,
-        Mobile: formFields.mobile,
+        Phone: formFields.mobile,
 
         Complete_Address: fullAddress,
         City_1: formFields.city,
@@ -158,7 +158,7 @@ if (!contactData.data || contactData.data.length === 0) {
       data: [{
         Last_Name: formFields.fullName,
         Email: formFields.email,
-        Mobile: formFields.mobile,
+        Phone: formFields.mobile,
 
         Complete_Address: fullAddress,
         City_1: formFields.city,
@@ -200,7 +200,7 @@ if (!contactData.data || contactData.data.length === 0) {
     data: [{
       Last_Name: formFields.fullName,
       Email: formFields.email,
-      Mobile: formFields.mobile,
+      Phone: formFields.mobile,
 
       Complete_Address: fullAddress,
       City_1: formFields.city,
