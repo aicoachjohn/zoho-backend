@@ -148,11 +148,6 @@ if (!contactData.data || contactData.data.length === 0) {
 
   console.log("🟢 Creating Contact");
 
-  const paymentMethod = formFields.paymentMethod?.trim();
-  const paymentPlan = formFields.paymentPlan?.trim(); 
-
-  const method = paymentMethod?.toLowerCase();
-
   const createContactRes = await fetch("https://www.zohoapis.in/crm/v2/Contacts", {
     method: "POST",
     headers: {
@@ -176,8 +171,8 @@ if (!contactData.data || contactData.data.length === 0) {
         Lecture_Language: formFields.lectureLanguage,
         Course_Start_Date: formFields.courseStartDate,
 
-        Payment_Method:paymentMethod,
-        Payment_Plan:paymentPlan,
+        Payment_Method: formFields.paymentMethod,
+        Payment_Plan: formFields.paymentPlan,
 
         Lead_Source: lead.Lead_Source,
         Lead_Status: lead.Lead_Status,
@@ -194,11 +189,6 @@ if (!contactData.data || contactData.data.length === 0) {
 
   console.log("🟡 Contact already exists");
   contactId = contactData.data[0].id;
-
-  const paymentMethod = formFields.paymentMethod?.trim();
-  const paymentPlan = formFields.paymentPlan?.trim(); 
-
-  const method = paymentMethod?.toLowerCase();
 
   await fetch(`https://www.zohoapis.in/crm/v2/Contacts/${contactId}`, {
   method: "PUT",
@@ -224,8 +214,8 @@ if (!contactData.data || contactData.data.length === 0) {
       Lecture_Language: formFields.lectureLanguage,
       Course_Start_Date: formFields.courseStartDate,
 
-      Payment_Method:paymentMethod,
-      Payment_Plan:paymentPlan
+      Payment_Method: formFields.paymentMethod,
+      Payment_Plan: formFields.paymentPlan
     }]
   })
 });
