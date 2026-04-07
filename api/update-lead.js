@@ -176,8 +176,8 @@ if (!contactData.data || contactData.data.length === 0) {
         Lecture_Language: formFields.lectureLanguage,
         Course_Start_Date: formFields.courseStartDate,
 
-        Payment_Method: formFields.paymentMethod,
-        Payment_Plan: formFields.paymentPlan,
+        Payment_Method:paymentMethod,
+        Payment_Plan:paymentPlan,
 
         Lead_Source: lead.Lead_Source,
         Lead_Status: lead.Lead_Status,
@@ -194,6 +194,11 @@ if (!contactData.data || contactData.data.length === 0) {
 
   console.log("🟡 Contact already exists");
   contactId = contactData.data[0].id;
+
+  const paymentMethod = formFields.paymentMethod?.trim();
+  const paymentPlan = formFields.paymentPlan?.trim(); 
+
+  const method = paymentMethod?.toLowerCase();
 
   await fetch(`https://www.zohoapis.in/crm/v2/Contacts/${contactId}`, {
   method: "PUT",
@@ -219,8 +224,8 @@ if (!contactData.data || contactData.data.length === 0) {
       Lecture_Language: formFields.lectureLanguage,
       Course_Start_Date: formFields.courseStartDate,
 
-      Payment_Method: formFields.paymentMethod,
-      Payment_Plan: formFields.paymentPlan
+      Payment_Method:paymentMethod,
+      Payment_Plan:paymentPlan
     }]
   })
 });
@@ -231,7 +236,10 @@ if (!contactData.data || contactData.data.length === 0) {
 let pipeline = "";
 let stage = "";
 
+const paymentMethod = formFields.paymentMethod?.trim();
+const paymentPlan = formFields.paymentPlan?.trim(); 
 
+const method = paymentMethod?.toLowerCase();
 
 if (method === "course hold") {
   pipeline = "Course Holding Pipeline";
