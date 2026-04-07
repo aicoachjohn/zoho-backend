@@ -166,10 +166,18 @@ if (!contactData.data || contactData.data.length === 0) {
         Country_1: formFields.addressCountry || formFields.country,
         Pincode: formFields.pincode,
 
+        Course_Name: formFields.courseName,
+        Course_Type: formFields.courseType,
+        Lecture_Language: formFields.lectureLanguage,
+        Course_Start_Date: formFields.courseStartDate,
+
+        Payment_Method: formFields.paymentMethod,
+        Payment_Plan: formFields.paymentPlan,
+
         Lead_Source: lead.Lead_Source,
         Lead_Status: lead.Lead_Status,
         Service_Interested_In: lead.Service_Interested_In,
-        PIB_LEAD_ID: lead.PIB_LEAD_ID
+        PIB_LEAD_ID: lead.PIB_LEAD_ID 
       }]
     })
   });
@@ -181,6 +189,36 @@ if (!contactData.data || contactData.data.length === 0) {
 
   console.log("🟡 Contact already exists");
   contactId = contactData.data[0].id;
+
+  await fetch(`https://www.zohoapis.in/crm/v2/Contacts/${contactId}`, {
+  method: "PUT",
+  headers: {
+    Authorization: `Zoho-oauthtoken ${accessToken}`,
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    data: [{
+      Last_Name: formFields.fullName,
+      Email: formFields.email,
+      Mobile: formFields.mobile,
+
+      Complete_Address: fullAddress,
+      City_1: formFields.city,
+      State_1: formFields.state,
+      Country_1: formFields.addressCountry || formFields.country,
+      Pincode: formFields.pincode,
+
+      // ✅ ADD THESE
+      Course_Name: formFields.courseName,
+      Course_Type: formFields.courseType,
+      Lecture_Language: formFields.lectureLanguage,
+      Course_Start_Date: formFields.courseStartDate,
+
+      Payment_Method: formFields.paymentMethod,
+      Payment_Plan: formFields.paymentPlan
+    }]
+  })
+});
 }
 
 
