@@ -148,6 +148,11 @@ if (!contactData.data || contactData.data.length === 0) {
 
   console.log("🟢 Creating Contact");
 
+  const paymentMethod = formFields.paymentMethod?.trim();
+  const paymentPlan = formFields.paymentPlan?.trim(); 
+
+  const method = paymentMethod?.toLowerCase();
+
   const createContactRes = await fetch("https://www.zohoapis.in/crm/v2/Contacts", {
     method: "POST",
     headers: {
@@ -226,10 +231,7 @@ if (!contactData.data || contactData.data.length === 0) {
 let pipeline = "";
 let stage = "";
 
-const paymentMethod = formFields.paymentMethod?.trim();
-const paymentPlan = formFields.paymentPlan?.trim(); 
 
-const method = paymentMethod?.toLowerCase();
 
 if (method === "course hold") {
   pipeline = "Course Holding Pipeline";
