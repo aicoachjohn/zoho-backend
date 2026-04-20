@@ -236,11 +236,11 @@ if (method === "course hold") {
 }
 else if (method === "single shot") {
   pipeline = "Single Shot Pipeline";
-  stage = "Payment Pending";
+  stage = "Payment Completed";
 }
 else if (method === "installment") {
   pipeline = "Installments Pipeline";
-  stage = "Plan Confirmed";
+  stage = "Initial Payment Done";
 }
 
 
