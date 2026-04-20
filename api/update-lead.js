@@ -156,6 +156,7 @@ if (!contactData.data || contactData.data.length === 0) {
     },
     body: JSON.stringify({
       data: [{
+        Owner: { id: leadOwnerId },
         Last_Name: formFields.fullName,
         Email: formFields.email,
         Phone: formFields.mobile,
@@ -198,6 +199,7 @@ if (!contactData.data || contactData.data.length === 0) {
   },
   body: JSON.stringify({
     data: [{
+      Owner: { id: leadOwnerId },
       Last_Name: formFields.fullName,
       Email: formFields.email,
       Phone: formFields.mobile,
