@@ -113,7 +113,9 @@ if (leadId) {
     },
     body: JSON.stringify({
       data: [{
-        Last_Name: formFields.fullName,
+        Salutation: formFields.salutation,
+        First_Name: formFields.firstName,
+        Last_Name: formFields.lastName || "NA",
         Email: formFields.email,
         Phone: formFields.mobile,
 
@@ -157,7 +159,9 @@ if (!contactData.data || contactData.data.length === 0) {
     body: JSON.stringify({
       data: [{
         Owner: { id: leadOwnerId },
-        Last_Name: formFields.fullName,
+        Salutation: formFields.salutation,
+        First_Name: formFields.firstName,
+        Last_Name: formFields.lastName || "NA",
         Email: formFields.email,
         Phone: formFields.mobile,
 
@@ -173,6 +177,7 @@ if (!contactData.data || contactData.data.length === 0) {
         Course_Start_Date: formFields.courseStartDate,
 
         Payment_Plan: formFields.paymentMethod,
+        GST_Treatment: formFields.gstTreatment,
         
 
         Lead_Source: lead.Lead_Source,
@@ -200,7 +205,9 @@ if (!contactData.data || contactData.data.length === 0) {
   body: JSON.stringify({
     data: [{
       Owner: { id: leadOwnerId },
-      Last_Name: formFields.fullName,
+      Salutation: formFields.salutation,
+      First_Name: formFields.firstName,
+      Last_Name: formFields.lastName || "NA",
       Email: formFields.email,
       Phone: formFields.mobile,
 
@@ -216,6 +223,7 @@ if (!contactData.data || contactData.data.length === 0) {
       Lecture_Language: formFields.lectureLanguage,
       Course_Start_Date: formFields.courseStartDate,
 
+      GST_Treatment: formFields.gstTreatment,
       Payment_Plan: formFields.paymentMethod
     }]
   })
