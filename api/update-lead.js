@@ -48,14 +48,6 @@ const pib_id_clean = pib_id
   .trim()
   .replace(/\s*-\s*/g, "-");
 
-// ✅ ADDRESS BUILDER
-const fullAddress = [
-  formFields.address,
-  formFields.city,
-  formFields.state,
-  formFields.pincode,
-  formFields.addressCountry
-].filter(Boolean).join(", ");
 
 
 const leadRes = await fetch(
@@ -119,7 +111,7 @@ if (leadId) {
         Email: formFields.email,
         Phone: formFields.mobile,
 
-        Complete_Address: fullAddress,
+        Complete_Address: formFields.address,
         City_1: formFields.city,
         State_1: formFields.state,
         Country_1: formFields.addressCountry || formFields.country,
@@ -165,7 +157,7 @@ if (!contactData.data || contactData.data.length === 0) {
         Email: formFields.email,
         Phone: formFields.mobile,
 
-        Complete_Address: fullAddress,
+        Complete_Address: formFields.address,
         City_1: formFields.city,
         State_1: formFields.state,
         Country_1: formFields.addressCountry || formFields.country,
@@ -211,7 +203,7 @@ if (!contactData.data || contactData.data.length === 0) {
       Email: formFields.email,
       Phone: formFields.mobile,
 
-      Complete_Address: fullAddress,
+      Complete_Address: formFields.address,
       City_1: formFields.city,
       State_1: formFields.state,
       Country_1: formFields.addressCountry || formFields.country,
@@ -291,7 +283,7 @@ const dealPayload = {
   Lecture_Language: formFields.lectureLanguage,
   Course_Start_Date: formFields.courseStartDate,
 
-  Complete_Address: fullAddress,
+  Complete_Address: formFields.address,
   City_1: formFields.city,
   State_1: formFields.state,
   Country_1: formFields.addressCountry || formFields.country,
