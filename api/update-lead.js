@@ -269,13 +269,22 @@ else if (method === "installment") {
 }
 
 
-// 🔹 SEARCH DEAL (FIXED)
+// 🔹 SEARCH DEAL — by Contact + PIB_LEAD_ID (prevents hitting another person's deal)
 const dealRes = await fetch(
-  `https://www.zohoapis.in/crm/v2/Deals/search?criteria=(PIB_LEAD_ID:equals:"${pib_id_clean}")`,
+  `https://www.zohoapis.in/crm/v2/Deals/search?criteria=((Contact_Name:equals:${contactId})and(PIB_LEAD_ID:equals:"${pib_id_clean}"))`,
   { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
 );
 
 const dealData = await safeParse(dealRes, "DEAL SEARCH");
+
+// Extra safety: even if Zoho returns multiple, only keep deals that belong to THIS contact
+let matchedDeal = null;
+if (dealData.data && dealData.data.length > 0) {
+  matchedDeal = dealData.data.find(d => {
+    const linkedContactId = d.Contact_Name?.id || d.Contact_Name;
+    return String(linkedContactId) === String(contactId);
+  });
+}
 
 
 // 🔹 DEAL PAYLOAD
@@ -319,7 +328,7 @@ const dealPayload = {
 };
 
 
-if (!dealData.data || dealData.data.length === 0) {
+if (!matchedDeal) {
 
   console.log("🟢 Creating Deal");
 
@@ -334,9 +343,9 @@ if (!dealData.data || dealData.data.length === 0) {
 
 } else {
 
-  console.log("🟡 Updating Deal");
+  console.log("🟡 Updating Deal", matchedDeal.id);
 
-  const dealId = dealData.data[0].id;
+  const dealId = matchedDeal.id;
 
   await zohoCall(`https://www.zohoapis.in/crm/v2/Deals/${dealId}`, {
     method: "PUT",
