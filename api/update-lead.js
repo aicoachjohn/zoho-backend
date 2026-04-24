@@ -289,7 +289,7 @@ if (dealData.data && dealData.data.length > 0) {
 
 // 🔹 DEAL PAYLOAD
 const dealPayload = {
-  Deal_Name: formFields.fullName,
+  Deal_Name: formFields.fullName || `${formFields.firstName || ""} ${formFields.lastName || ""}`.trim() || "NA",
   Owner: { id: leadOwnerId },
 
   Contact_Name: { id: contactId },
