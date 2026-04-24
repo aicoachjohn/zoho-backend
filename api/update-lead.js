@@ -7,6 +7,10 @@ res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 if (req.method === "OPTIONS") return res.status(200).end();
 if (req.method !== "POST") return res.status(405).json({ message: "Method not allowed" });
 
+// 🔹 LOG INCOMING PAYLOAD (helps diff desktop vs mobile)
+console.log("📥 Incoming payload:", JSON.stringify(req.body, null, 2));
+console.log("📥 User-Agent:", req.headers["user-agent"]);
+
 const { pib_id, ...formFields } = req.body;
 
 if (!pib_id) return res.status(400).json({ message: "Missing pib_id" });
@@ -21,6 +25,26 @@ async function safeParse(response, label) {
     console.error(`❌ JSON Parse Error in ${label}:`, text);
     return {};
   }
+}
+
+// 🔹 WRAPPER: throws on HTTP error AND on per-record Zoho errors
+async function zohoCall(url, options, label) {
+  const response = await fetch(url, options);
+  const data = await safeParse(response, label);
+
+  if (!response.ok) {
+    console.error(`❌ ${label} HTTP ${response.status}`, data);
+    throw new Error(`${label} failed (HTTP ${response.status}): ${JSON.stringify(data)}`);
+  }
+
+  // Zoho returns HTTP 200 even when individual records fail.
+  // Check per-record status inside data[0]
+  if (Array.isArray(data.data) && data.data[0]?.status === "error") {
+    console.error(`❌ ${label} record error`, data.data[0]);
+    throw new Error(`${label} record error: ${data.data[0].message} | details: ${JSON.stringify(data.data[0].details)}`);
+  }
+
+  return data;
 }
 
 try {
@@ -97,7 +121,7 @@ if (leadData.data && leadData.data.length > 0) {
 
 // 🔹 UPDATE LEAD (only if leadId exists)
 if (leadId) {
-  await fetch(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
+  await zohoCall(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
     method: "PUT",
     headers: {
       Authorization: `Zoho-oauthtoken ${accessToken}`,
@@ -124,7 +148,7 @@ if (leadId) {
         Enrollment_Status: "Enrollment Form Submitted"
       }]
     })
-  });
+  }, "UPDATE LEAD");
 }
 
 
@@ -142,7 +166,7 @@ if (!contactData.data || contactData.data.length === 0) {
 
   console.log("🟢 Creating Contact");
 
-  const createContactRes = await fetch("https://www.zohoapis.in/crm/v2/Contacts", {
+  const newContact = await zohoCall("https://www.zohoapis.in/crm/v2/Contacts", {
     method: "POST",
     headers: {
       Authorization: `Zoho-oauthtoken ${accessToken}`,
@@ -178,9 +202,8 @@ if (!contactData.data || contactData.data.length === 0) {
         PIB_LEAD_ID: lead.PIB_LEAD_ID 
       }]
     })
-  });
+  }, "CREATE CONTACT");
 
-  const newContact = await safeParse(createContactRes, "CREATE CONTACT");
   contactId = newContact.data?.[0]?.details?.id;
 
 } else {
@@ -188,7 +211,7 @@ if (!contactData.data || contactData.data.length === 0) {
   console.log("🟡 Contact already exists");
   contactId = contactData.data[0].id;
 
-  await fetch(`https://www.zohoapis.in/crm/v2/Contacts/${contactId}`, {
+  await zohoCall(`https://www.zohoapis.in/crm/v2/Contacts/${contactId}`, {
   method: "PUT",
   headers: {
     Authorization: `Zoho-oauthtoken ${accessToken}`,
@@ -219,7 +242,7 @@ if (!contactData.data || contactData.data.length === 0) {
       Payment_Plan: formFields.paymentMethod
     }]
   })
-});
+}, "UPDATE CONTACT");
 }
 
 
@@ -300,14 +323,14 @@ if (!dealData.data || dealData.data.length === 0) {
 
   console.log("🟢 Creating Deal");
 
-  await fetch("https://www.zohoapis.in/crm/v2/Deals", {
+  await zohoCall("https://www.zohoapis.in/crm/v2/Deals", {
     method: "POST",
     headers: {
       Authorization: `Zoho-oauthtoken ${accessToken}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({ data: [dealPayload] })
-  });
+  }, "CREATE DEAL");
 
 } else {
 
@@ -315,14 +338,14 @@ if (!dealData.data || dealData.data.length === 0) {
 
   const dealId = dealData.data[0].id;
 
-  await fetch(`https://www.zohoapis.in/crm/v2/Deals/${dealId}`, {
+  await zohoCall(`https://www.zohoapis.in/crm/v2/Deals/${dealId}`, {
     method: "PUT",
     headers: {
       Authorization: `Zoho-oauthtoken ${accessToken}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({ data: [dealPayload] })
-  });
+  }, "UPDATE DEAL");
 }
 
 return res.status(200).json({
