@@ -132,7 +132,6 @@ if (leadId) {
         Salutation: formFields.salutation,
         First_Name: formFields.firstName,
         Last_Name: formFields.lastName || "NA",
-        Email: formFields.email,
         Phone: formFields.mobile,
 
         Complete_Address: formFields.address,
@@ -178,7 +177,6 @@ if (!contactData.data || contactData.data.length === 0) {
         Salutation: formFields.salutation,
         First_Name: formFields.firstName,
         Last_Name: formFields.lastName || "NA",
-        Email: formFields.email,
         Phone: formFields.mobile,
 
         Complete_Address: formFields.address,
@@ -223,7 +221,6 @@ if (!contactData.data || contactData.data.length === 0) {
       Salutation: formFields.salutation,
       First_Name: formFields.firstName,
       Last_Name: formFields.lastName || "NA",
-      Email: formFields.email,
       Phone: formFields.mobile,
 
       Complete_Address: formFields.address,
