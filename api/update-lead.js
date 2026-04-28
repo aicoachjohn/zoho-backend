@@ -120,33 +120,46 @@ if (leadData.data && leadData.data.length > 0) {
 
 
 // 🔹 UPDATE LEAD (only if leadId exists)
+// 🔹 UPDATE LEAD (only if leadId exists)
 if (leadId) {
+  // Build payload with all the standard fields
+  const leadUpdatePayload = {
+    Salutation: formFields.salutation,
+    First_Name: formFields.firstName,
+    Last_Name: formFields.lastName || "NA",
+
+    Complete_Address: formFields.address,
+    City_1: formFields.city,
+    State_1: formFields.state,
+    Country_1: formFields.addressCountry || formFields.country,
+    Pincode: formFields.pincode,
+
+    Course_Name: formFields.courseName,
+    Course_Type: formFields.courseType,
+    Lecture_Language: formFields.lectureLanguage,
+    Course_Start_Date: formFields.courseStartDate,
+    Enrollment_Status: "Enrollment Form Submitted"
+  };
+
+  // 🔹 Only include Email if user actually changed it
+  if (formFields.email && formFields.email.trim().toLowerCase() !== (lead.Email || "").trim().toLowerCase()) {
+    leadUpdatePayload.Email = formFields.email;
+    console.log(`📝 Email changed: "${lead.Email}" → "${formFields.email}"`);
+  }
+
+  // 🔹 Only include Phone if user actually changed it
+  if (formFields.mobile && String(formFields.mobile).trim() !== String(lead.Phone || "").trim()) {
+    leadUpdatePayload.Phone = formFields.mobile;
+    console.log(`📝 Phone changed: "${lead.Phone}" → "${formFields.mobile}"`);
+  }
+
   await zohoCall(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
     method: "PUT",
     headers: {
       Authorization: `Zoho-oauthtoken ${accessToken}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      data: [{
-        Salutation: formFields.salutation,
-        First_Name: formFields.firstName,
-        Last_Name: formFields.lastName || "NA",
-        Phone: formFields.mobile,
-
-        Complete_Address: formFields.address,
-        City_1: formFields.city,
-        State_1: formFields.state,
-        Country_1: formFields.addressCountry || formFields.country,
-        Pincode: formFields.pincode,
-
-        Course_Name: formFields.courseName,
-        Course_Type: formFields.courseType,
-        Lecture_Language: formFields.lectureLanguage,
-        Course_Start_Date: formFields.courseStartDate,
-        Enrollment_Status: "Enrollment Form Submitted"
-      }]
-    })
+    body: JSON.stringify({ data: [leadUpdatePayload] })
   }, "UPDATE LEAD");
 }
 
@@ -208,38 +221,58 @@ if (!contactData.data || contactData.data.length === 0) {
 
   console.log("🟡 Contact already exists");
   contactId = contactData.data[0].id;
+  
+  // 🔹 Reference to existing contact for change detection
+  const existingContact = contactData.data[0];
+
+  // 🔹 Build base payload (fields that are safe to always update)
+  const contactUpdatePayload = {
+    Owner: { id: leadOwnerId },
+    Salutation: formFields.salutation,
+    First_Name: formFields.firstName,
+    Last_Name: formFields.lastName || "NA",
+
+    Complete_Address: formFields.address,
+    City_1: formFields.city,
+    State_1: formFields.state,
+    Country_1: formFields.addressCountry || formFields.country,
+    Pincode: formFields.pincode,
+
+    Course_Name: formFields.courseName,
+    Course_Type: formFields.courseType,
+    Lecture_Language: formFields.lectureLanguage,
+    Course_Start_Date: formFields.courseStartDate,
+
+    GST_Treatment: formFields.gstTreatment,
+    Payment_Plan: formFields.paymentMethod
+  };
+
+  // 🔹 Only include Email if it actually changed (case-insensitive comparison)
+  if (
+    formFields.email &&
+    formFields.email.trim().toLowerCase() !== (existingContact.Email || "").trim().toLowerCase()
+  ) {
+    contactUpdatePayload.Email = formFields.email;
+    console.log(`📝 Contact Email changed: "${existingContact.Email}" → "${formFields.email}"`);
+  }
+
+  // 🔹 Only include Phone if it actually changed
+  if (
+    formFields.mobile &&
+    String(formFields.mobile).trim() !== String(existingContact.Phone || "").trim()
+  ) {
+    contactUpdatePayload.Phone = formFields.mobile;
+    console.log(`📝 Contact Phone changed: "${existingContact.Phone}" → "${formFields.mobile}"`);
+  }
 
   await zohoCall(`https://www.zohoapis.in/crm/v2/Contacts/${contactId}`, {
-  method: "PUT",
-  headers: {
-    Authorization: `Zoho-oauthtoken ${accessToken}`,
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    data: [{
-      Owner: { id: leadOwnerId },
-      Salutation: formFields.salutation,
-      First_Name: formFields.firstName,
-      Last_Name: formFields.lastName || "NA",
-      Phone: formFields.mobile,
-
-      Complete_Address: formFields.address,
-      City_1: formFields.city,
-      State_1: formFields.state,
-      Country_1: formFields.addressCountry || formFields.country,
-      Pincode: formFields.pincode,
-
-      // ✅ ADD THESE
-      Course_Name: formFields.courseName,
-      Course_Type: formFields.courseType,
-      Lecture_Language: formFields.lectureLanguage,
-      Course_Start_Date: formFields.courseStartDate,
-
-      GST_Treatment: formFields.gstTreatment,
-      Payment_Plan: formFields.paymentMethod
-    }]
-  })
-}, "UPDATE CONTACT");
+    method: "PUT",
+    headers: {
+      Authorization: `Zoho-oauthtoken ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ data: [contactUpdatePayload] })
+  }, "UPDATE CONTACT");
 }
 
 
