@@ -1,4 +1,3 @@
-
 export default async function handler(req, res) {
 
 res.setHeader("Access-Control-Allow-Origin", "https://enroll.proitbridge.com");
@@ -151,6 +150,68 @@ if (leadId) {
 }
 
 
+// 🔹 PAYMENT PLAN LOGIC (moved up — needed by CONVERT LEAD below)
+let pipeline = "";
+let stage = "";
+
+const paymentMethod = formFields.paymentMethod?.trim();
+const paymentPlan = formFields.paymentPlan?.trim(); 
+
+const method = paymentMethod?.toLowerCase();
+
+if (method === "course hold") {
+  pipeline = "Course Holding Pipeline";
+  stage = "Hold Discussion";
+}
+else if (method === "single shot") {
+  pipeline = "Single Shot Pipeline";
+  stage = "Payment Completed";
+}
+else if (method === "installment") {
+  pipeline = "Installments Pipeline";
+  stage = "Initial Payment Done";
+}
+
+
+// 🔹 CONVERT LEAD → CONTACT + DEAL (only if we actually have a Lead)
+if (leadId) {
+
+  console.log("🔄 Converting Lead to Contact + Deal");
+
+  const convertPayload = {
+    data: [{
+      overwrite: true,
+      notify_lead_owner: false,
+      notify_new_entity_owner: false,
+      Accounts: null,
+      Contacts: null,
+      assign_to: leadOwnerId,
+      Deals: {
+        Deal_Name: formFields.fullName || `${formFields.firstName || ""} ${formFields.lastName || ""}`.trim() || "NA",
+        Stage: stage,
+        Pipeline: pipeline,
+        Closing_Date: formFields.courseStartDate,
+        Amount: formFields.totalFee,
+        PIB_LEAD_ID: pib_id_clean
+      }
+    }]
+  };
+
+  await zohoCall(
+    `https://www.zohoapis.in/crm/v2/Leads/${leadId}/actions/convert`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Zoho-oauthtoken ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(convertPayload)
+    },
+    "CONVERT LEAD"
+  );
+}
+
+
 // 🔹 CHECK / CREATE CONTACT
 const contactRes = await fetch(
   `https://www.zohoapis.in/crm/v2/Contacts/search?criteria=(Email:equals:${encodeURIComponent(formFields.email)})`,
@@ -241,29 +302,6 @@ if (!contactData.data || contactData.data.length === 0) {
     }]
   })
 }, "UPDATE CONTACT");
-}
-
-
-// 🔹 PAYMENT PLAN LOGIC
-let pipeline = "";
-let stage = "";
-
-const paymentMethod = formFields.paymentMethod?.trim();
-const paymentPlan = formFields.paymentPlan?.trim(); 
-
-const method = paymentMethod?.toLowerCase();
-
-if (method === "course hold") {
-  pipeline = "Course Holding Pipeline";
-  stage = "Hold Discussion";
-}
-else if (method === "single shot") {
-  pipeline = "Single Shot Pipeline";
-  stage = "Payment Completed";
-}
-else if (method === "installment") {
-  pipeline = "Installments Pipeline";
-  stage = "Initial Payment Done";
 }
 
 
@@ -364,4 +402,4 @@ return res.status(200).json({
 console.error("🔥 ERROR:", err);
 return res.status(500).json({ error: err.message });
 }
-}  
+}
