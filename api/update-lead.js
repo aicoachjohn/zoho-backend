@@ -178,23 +178,21 @@ if (leadId) {
 
   console.log("🔄 Converting Lead to Contact + Deal");
 
-  const convertPayload = {
-    data: [{
-      overwrite: true,
-      notify_lead_owner: false,
-      notify_new_entity_owner: false,
-      Accounts: null,
-      Contacts: null,
-      assign_to: leadOwnerId,
-      Deals: {
-        Deal_Name: formFields.fullName || `${formFields.firstName || ""} ${formFields.lastName || ""}`.trim() || "NA",
-        Stage: stage,
-        Pipeline: pipeline,
-        Amount: formFields.totalFee,
-        PIB_LEAD_ID: pib_id_clean
-      }
-    }]
-  };
+    const convertPayload = {
+      data: [{
+        overwrite: true,
+        notify_lead_owner: false,
+        notify_new_entity_owner: false,
+        assign_to: leadOwnerId,
+        Deals: {
+          Deal_Name: formFields.fullName || `${formFields.firstName || ""} ${formFields.lastName || ""}`.trim() || "NA",
+          Stage: stage,
+          Pipeline: pipeline,
+          Amount: formFields.totalFee,
+          PIB_LEAD_ID: pib_id_clean
+        }
+      }]
+    };
 
   await zohoCall(
     `https://www.zohoapis.in/crm/v2/Leads/${leadId}/actions/convert`,
