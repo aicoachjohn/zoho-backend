@@ -190,7 +190,6 @@ if (leadId) {
         Deal_Name: formFields.fullName || `${formFields.firstName || ""} ${formFields.lastName || ""}`.trim() || "NA",
         Stage: stage,
         Pipeline: pipeline,
-        Closing_Date: formFields.courseStartDate,
         Amount: formFields.totalFee,
         PIB_LEAD_ID: pib_id_clean
       }
