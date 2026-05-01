@@ -174,6 +174,9 @@ else if (method === "installment") {
 
 
 // 🔹 CONVERT LEAD → CONTACT + DEAL (only if we actually have a Lead)
+let convertedContactId = null;
+let convertedDealId = null;
+
 if (leadId) {
 
   console.log("🔄 Converting Lead to Contact + Deal");
@@ -194,7 +197,7 @@ if (leadId) {
       }]
     };
 
-  await zohoCall(
+  const convertRes = await zohoCall(
     `https://www.zohoapis.in/crm/v2/Leads/${leadId}/actions/convert`,
     {
       method: "POST",
@@ -206,6 +209,12 @@ if (leadId) {
     },
     "CONVERT LEAD"
   );
+
+  const converted = convertRes.data?.[0] || {};
+  convertedContactId = converted.Contacts;
+  convertedDealId = converted.Deals;
+
+  console.log("✅ Convert IDs:", { convertedContactId, convertedDealId });
 }
 
 
@@ -295,28 +304,37 @@ if (!contactData.data || contactData.data.length === 0) {
       Course_Start_Date: formFields.courseStartDate,
 
       GST_Treatment: formFields.gstTreatment,
-      Payment_Plan: formFields.paymentMethod
+      Payment_Plan: formFields.paymentMethod,
+
+      PIB_LEAD_ID: pib_id_clean
     }]
   })
 }, "UPDATE CONTACT");
 }
 
 
-// 🔹 SEARCH DEAL — by Contact + PIB_LEAD_ID (prevents hitting another person's deal)
-const dealRes = await fetch(
-  `https://www.zohoapis.in/crm/v2/Deals/search?criteria=((Contact_Name:equals:${contactId})and(PIB_LEAD_ID:equals:"${pib_id_clean}"))`,
-  { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
-);
-
-const dealData = await safeParse(dealRes, "DEAL SEARCH");
-
-// Extra safety: even if Zoho returns multiple, only keep deals that belong to THIS contact
+// 🔹 RESOLVE DEAL — prefer the just-converted Deal ID; otherwise search (for re-submissions)
 let matchedDeal = null;
-if (dealData.data && dealData.data.length > 0) {
-  matchedDeal = dealData.data.find(d => {
-    const linkedContactId = d.Contact_Name?.id || d.Contact_Name;
-    return String(linkedContactId) === String(contactId);
-  });
+
+if (convertedDealId) {
+  // Conversion just ran — use the Deal it created. Skip search to avoid index-lag duplicates.
+  matchedDeal = { id: convertedDealId };
+  console.log("🔗 Using Deal from conversion:", convertedDealId);
+} else {
+  const dealRes = await fetch(
+    `https://www.zohoapis.in/crm/v2/Deals/search?criteria=((Contact_Name:equals:${contactId})and(PIB_LEAD_ID:equals:"${pib_id_clean}"))`,
+    { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
+  );
+
+  const dealData = await safeParse(dealRes, "DEAL SEARCH");
+
+  // Extra safety: even if Zoho returns multiple, only keep deals that belong to THIS contact
+  if (dealData.data && dealData.data.length > 0) {
+    matchedDeal = dealData.data.find(d => {
+      const linkedContactId = d.Contact_Name?.id || d.Contact_Name;
+      return String(linkedContactId) === String(contactId);
+    });
+  }
 }
 
 
