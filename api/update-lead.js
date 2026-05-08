@@ -183,10 +183,15 @@ if (leadId) {
 
     const convertPayload = {
       data: [{
-        overwrite: true,
-        notify_lead_owner: false,
-        notify_new_entity_owner: false,
+        // matches "Notify record owner" checkbox in manual Convert dialog
+        // flip to false if you don't want counselors getting an email per enrollment
+        notify_lead_owner: true,
+        notify_new_entity_owner: true,
+
+        // matches "Owner of the New Records" dropdown
         assign_to: leadOwnerId,
+
+        // matches "Create a new Deal for this Contact" checkbox (we always want one)
         Deals: {
           Deal_Name: formFields.fullName || `${formFields.firstName || ""} ${formFields.lastName || ""}`.trim() || "NA",
           Stage: stage,
