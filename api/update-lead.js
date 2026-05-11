@@ -1,470 +1,458 @@
 export default async function handler(req, res) {
 
-res.setHeader("Access-Control-Allow-Origin", "https://enroll.proitbridge.com");
-res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Origin", "https://enroll.proitbridge.com");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-if (req.method === "OPTIONS") return res.status(200).end();
-if (req.method !== "POST") return res.status(405).json({ message: "Method not allowed" });
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ message: "Method not allowed" });
 
-// 🔹 LOG INCOMING PAYLOAD (helps diff desktop vs mobile)
-console.log("📥 Incoming payload:", JSON.stringify(req.body, null, 2));
-console.log("📥 User-Agent:", req.headers["user-agent"]);
+  // 🔹 LOG INCOMING PAYLOAD (helps diff desktop vs mobile)
+  console.log("📥 Incoming payload:", JSON.stringify(req.body, null, 2));
+  console.log("📥 User-Agent:", req.headers["user-agent"]);
 
-const { pib_id, ...formFields } = req.body;
+  const { pib_id, ...formFields } = req.body;
 
-if (!pib_id) return res.status(400).json({ message: "Missing pib_id" });
+  if (!pib_id) return res.status(400).json({ message: "Missing pib_id" });
 
-async function safeParse(response, label) {
-  const text = await response.text();
-  console.log(`🔍 ${label}:`, text);
+  async function safeParse(response, label) {
+    const text = await response.text();
+    console.log(`🔍 ${label}:`, text);
+
+    try {
+      return text ? JSON.parse(text) : {};
+    } catch (e) {
+      console.error(`❌ JSON Parse Error in ${label}:`, text);
+      return {};
+    }
+  }
+
+  async function zohoCall(url, options, label) {
+    const response = await fetch(url, options);
+    const data = await safeParse(response, label);
+
+    if (!response.ok) {
+      console.error(`❌ ${label} HTTP ${response.status}`, data);
+      throw new Error(`${label} failed (HTTP ${response.status}): ${JSON.stringify(data)}`);
+    }
+
+    if (Array.isArray(data.data) && data.data[0]?.status === "error") {
+      console.error(`❌ ${label} record error`, data.data[0]);
+      throw new Error(`${label} record error: ${data.data[0].message} | details: ${JSON.stringify(data.data[0].details)}`);
+    }
+
+    return data;
+  }
 
   try {
-    return text ? JSON.parse(text) : {};
-  } catch (e) {
-    console.error(`❌ JSON Parse Error in ${label}:`, text);
-    return {};
-  }
-}
 
-// 🔹 WRAPPER: throws on HTTP error AND on per-record Zoho errors
-async function zohoCall(url, options, label) {
-  const response = await fetch(url, options);
-  const data = await safeParse(response, label);
+    const tokenRes = await fetch("https://accounts.zoho.in/oauth/v2/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        refresh_token: process.env.ZOHO_REFRESH_TOKEN,
+        client_id: process.env.ZOHO_CLIENT_ID,
+        client_secret: process.env.ZOHO_CLIENT_SECRET,
+        grant_type: "refresh_token"
+      })
+    });
 
-  if (!response.ok) {
-    console.error(`❌ ${label} HTTP ${response.status}`, data);
-    throw new Error(`${label} failed (HTTP ${response.status}): ${JSON.stringify(data)}`);
-  }
+    const tokenData = await safeParse(tokenRes, "TOKEN");
 
-  // Zoho returns HTTP 200 even when individual records fail.
-  // Check per-record status inside data[0]
-  if (Array.isArray(data.data) && data.data[0]?.status === "error") {
-    console.error(`❌ ${label} record error`, data.data[0]);
-    throw new Error(`${label} record error: ${data.data[0].message} | details: ${JSON.stringify(data.data[0].details)}`);
-  }
+    if (!tokenData.access_token) {
+      return res.status(500).json({ error: "Token failed", details: tokenData });
+    }
 
-  return data;
-}
+    const accessToken = tokenData.access_token;
 
-try {
-
-const tokenRes = await fetch("https://accounts.zoho.in/oauth/v2/token", {
-  method: "POST",
-  headers: { "Content-Type": "application/x-www-form-urlencoded" },
-  body: new URLSearchParams({
-    refresh_token: process.env.ZOHO_REFRESH_TOKEN,
-    client_id: process.env.ZOHO_CLIENT_ID,
-    client_secret: process.env.ZOHO_CLIENT_SECRET,
-    grant_type: "refresh_token"
-  })
-});
-
-const tokenData = await safeParse(tokenRes, "TOKEN");
-
-if (!tokenData.access_token) {
-  return res.status(500).json({ error: "Token failed", details: tokenData });
-}
-
-const accessToken = tokenData.access_token;
-
-const pib_id_clean = pib_id
-  .trim()
-  .replace(/\s*-\s*/g, "-");
+    const pib_id_clean = pib_id
+      .trim()
+      .replace(/\s*-\s*/g, "-");
 
 
+    const leadRes = await fetch(
+      `https://www.zohoapis.in/crm/v2/Leads/search?criteria=(PIB_LEAD_ID:equals:"${pib_id_clean}")`,
+      { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
+    );
 
-const leadRes = await fetch(
-  `https://www.zohoapis.in/crm/v2/Leads/search?criteria=(PIB_LEAD_ID:equals:"${pib_id_clean}")`,
-  { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
-);
+    const leadData = await safeParse(leadRes, "LEAD SEARCH");
 
-const leadData = await safeParse(leadRes, "LEAD SEARCH");
+    let lead = null;
+    let leadOwnerId = null;
+    let leadId = null;
 
-let lead = null;
-let leadOwnerId = null;
-let leadId = null;
+    if (leadData.data && leadData.data.length > 0) {
+      console.log("✅ Lead found in Leads");
+      lead = leadData.data[0];
+      leadOwnerId = lead.Owner.id;
+      leadId = lead.id;
+    } else {
+      console.log("⚠️ Lead not in Leads, checking Contacts...");
 
-if (leadData.data && leadData.data.length > 0) {
+      const contactResFallback = await fetch(
+        `https://www.zohoapis.in/crm/v2/Contacts/search?criteria=(PIB_LEAD_ID:equals:"${pib_id_clean}")`,
+        { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
+      );
 
-  console.log("✅ Lead found in Leads");
-  lead = leadData.data[0];
-  leadOwnerId = lead.Owner.id;
-  leadId = lead.id;
+      const contactFallbackData = await safeParse(contactResFallback, "CONTACT SEARCH FALLBACK");
 
-} else {
+      if (!contactFallbackData.data || contactFallbackData.data.length === 0) {
+        return res.status(404).json({ message: "Lead not found in Leads or Contacts" });
+      }
 
-  console.log("⚠️ Lead not in Leads, checking Contacts...");
+      console.log("✅ Found in Contacts (converted lead)");
 
-  const contactResFallback = await fetch(
-    `https://www.zohoapis.in/crm/v2/Contacts/search?criteria=(PIB_LEAD_ID:equals:"${pib_id_clean}")`,
-    { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
-  );
+      const contact = contactFallbackData.data[0];
 
-  const contactFallbackData = await safeParse(contactResFallback, "CONTACT SEARCH FALLBACK");
-
-  if (!contactFallbackData.data || contactFallbackData.data.length === 0) {
-    return res.status(404).json({ message: "Lead not found in Leads or Contacts" });
-  }
-
-  console.log("✅ Found in Contacts (converted lead)");
-
-  const contact = contactFallbackData.data[0];
-
-  // simulate lead object
-  lead = contact;
-  leadOwnerId = contact.Owner?.id;
+      // simulate lead object
+      lead = contact;
+      leadOwnerId = contact.Owner?.id;
+    }
 
 
-}
+    // 🔹 RESOLVE THE TRUE OWNER
+    // Prefer the Point of Contact from the form (original lead owner, captured at form-load).
+    // Fall back to whatever the Lead/Contact currently has if the form didn't send it.
+    const ownerId = formFields.pointOfContact || leadOwnerId;
+    console.log("👤 Resolved ownerId:", ownerId, "(formFields.pointOfContact:", formFields.pointOfContact, "| leadOwnerId:", leadOwnerId, ")");
 
 
-// 🔹 UPDATE LEAD (only if leadId exists)
-if (leadId) {
-  await zohoCall(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Zoho-oauthtoken ${accessToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      data: [{
-        Salutation: formFields.salutation,
-        First_Name: formFields.firstName,
-        Last_Name: formFields.lastName || "NA",
+    // 🔹 UPDATE LEAD (only if leadId exists)
+    if (leadId) {
+      await zohoCall(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Zoho-oauthtoken ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          data: [{
+            Salutation: formFields.salutation,
+            First_Name: formFields.firstName,
+            Last_Name: formFields.lastName || "NA",
 
-        Complete_Address: formFields.address,
-        City_1: formFields.city,
-        State_1: formFields.state,
-        Country_1: formFields.addressCountry || formFields.country,
-        Pincode: formFields.pincode,
+            Complete_Address: formFields.address,
+            City_1: formFields.city,
+            State_1: formFields.state,
+            Country_1: formFields.addressCountry || formFields.country,
+            Pincode: formFields.pincode,
 
-        Course_Name: formFields.courseName,
-        Course_Type: formFields.courseType,
-        Lecture_Language: formFields.lectureLanguage,
-        Course_Start_Date: formFields.courseStartDate,
-        Enrollment_Status: "Enrollment Form Submitted"
-      }]
-    })
-  }, "UPDATE LEAD");
-}
-
-
-// 🔹 PAYMENT PLAN LOGIC (moved up — needed by CONVERT LEAD below)
-let pipeline = "";
-let stage = "";
-
-const paymentMethod = formFields.paymentMethod?.trim();
-const paymentPlan = formFields.paymentPlan?.trim();
-
-const method = paymentMethod?.toLowerCase();
-
-if (method === "course hold") {
-  pipeline = "Course Holding Pipeline";
-  stage = "Hold Discussion";
-}
-else if (method === "single shot") {
-  pipeline = "Single Shot Pipeline";
-  stage = "Payment Completed";
-}
-else if (method === "installment") {
-  pipeline = "Installments Pipeline";
-  stage = "Initial Payment Done";
-}
+            Course_Name: formFields.courseName,
+            Course_Type: formFields.courseType,
+            Lecture_Language: formFields.lectureLanguage,
+            Course_Start_Date: formFields.courseStartDate,
+            Enrollment_Status: "Enrollment Form Submitted"
+          }],
+          trigger: []   // 🔒 prevent workflows from firing & reassigning Owner
+        })
+      }, "UPDATE LEAD");
+    }
 
 
-// 🔹 CONVERT LEAD → CONTACT + DEAL (only if we actually have a Lead)
-let convertedContactId = null;
-let convertedDealId = null;
+    // 🔹 PAYMENT PLAN LOGIC
+    let pipeline = "";
+    let stage = "";
 
-if (leadId) {
+    const paymentMethod = formFields.paymentMethod?.trim();
+    const paymentPlan = formFields.paymentPlan?.trim();
 
-  console.log("🔄 Converting Lead to Contact + Deal");
+    const method = paymentMethod?.toLowerCase();
 
-    const convertPayload = {
-      data: [{
-        // matches "Notify record owner" checkbox in manual Convert dialog
-        // flip to false if you don't want counselors getting an email per enrollment
-        notify_lead_owner: true,
-        notify_new_entity_owner: true,
+    if (method === "course hold") {
+      pipeline = "Course Holding Pipeline";
+      stage = "Hold Discussion";
+    } else if (method === "single shot") {
+      pipeline = "Single Shot Pipeline";
+      stage = "Payment Completed";
+    } else if (method === "installment") {
+      pipeline = "Installments Pipeline";
+      stage = "Initial Payment Done";
+    }
 
-        // matches "Owner of the New Records" dropdown
-        assign_to: leadOwnerId,
 
-        // matches "Create a new Deal for this Contact" checkbox (we always want one)
-        Deals: {
-          Deal_Name: formFields.fullName || `${formFields.firstName || ""} ${formFields.lastName || ""}`.trim() || "NA",
-          Stage: stage,
-          Pipeline: pipeline,
-          Amount: formFields.totalFee,
-          PIB_LEAD_ID: pib_id_clean
-        }
-      }]
+    // 🔹 CONVERT LEAD → CONTACT + DEAL (only if we actually have a Lead)
+    let convertedContactId = null;
+    let convertedDealId = null;
+
+    if (leadId) {
+
+      console.log("🔄 Converting Lead to Contact + Deal");
+
+      const convertPayload = {
+        data: [{
+          notify_lead_owner: true,
+          notify_new_entity_owner: true,
+
+          // 🔑 assign converted Contact + Account + Deal to the Point of Contact
+          assign_to: ownerId,
+
+          Deals: {
+            Deal_Name: formFields.fullName || `${formFields.firstName || ""} ${formFields.lastName || ""}`.trim() || "NA",
+            Stage: stage,
+            Pipeline: pipeline,
+            Amount: formFields.totalFee,
+            PIB_LEAD_ID: pib_id_clean,
+            Owner: { id: ownerId }   // 🔑 explicitly set Deal owner inside conversion
+          }
+        }]
+      };
+
+      const convertRes = await zohoCall(
+        `https://www.zohoapis.in/crm/v2/Leads/${leadId}/actions/convert`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Zoho-oauthtoken ${accessToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(convertPayload)
+        },
+        "CONVERT LEAD"
+      );
+
+      const converted = convertRes.data?.[0] || {};
+      convertedContactId = converted.Contacts;
+      convertedDealId = converted.Deals;
+
+      console.log("✅ Convert IDs:", { convertedContactId, convertedDealId });
+    }
+
+
+    // 🔹 RESOLVE CONTACT
+    let contactId = null;
+
+    if (convertedContactId) {
+      console.log("🔗 Using contact from conversion:", convertedContactId);
+      contactId = convertedContactId;
+
+      await zohoCall(`https://www.zohoapis.in/crm/v2/Contacts/${contactId}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Zoho-oauthtoken ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          data: [{
+            Owner: { id: ownerId },
+            Salutation: formFields.salutation,
+            First_Name: formFields.firstName,
+            Last_Name: formFields.lastName || "NA",
+            Email: formFields.email,
+            Phone: formFields.mobile,
+
+            Complete_Address: formFields.address,
+            City_1: formFields.city,
+            State_1: formFields.state,
+            Country_1: formFields.addressCountry || formFields.country,
+            Pincode: formFields.pincode,
+
+            Course_Name: formFields.courseName,
+            Course_Type: formFields.courseType,
+            Lecture_Language: formFields.lectureLanguage,
+            Course_Start_Date: formFields.courseStartDate,
+
+            Payment_Plan: formFields.paymentMethod,
+            GST_Treatment: formFields.gstTreatment,
+
+            PIB_LEAD_ID: pib_id_clean
+          }],
+          trigger: []   // 🔒 prevent workflows from re-firing
+        })
+      }, "UPDATE CONVERTED CONTACT");
+
+    } else {
+      console.log("🔎 Searching existing Contact by PIB_LEAD_ID");
+
+      const contactRes = await fetch(
+        `https://www.zohoapis.in/crm/v2/Contacts/search?criteria=(PIB_LEAD_ID:equals:"${pib_id_clean}")`,
+        { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
+      );
+
+      const contactData = await safeParse(contactRes, "CONTACT SEARCH BY PIB");
+
+      if (contactData.data && contactData.data.length > 0) {
+        console.log("🟡 Contact found, updating");
+        contactId = contactData.data[0].id;
+
+        await zohoCall(`https://www.zohoapis.in/crm/v2/Contacts/${contactId}`, {
+          method: "PUT",
+          headers: {
+            Authorization: `Zoho-oauthtoken ${accessToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            data: [{
+              Owner: { id: ownerId },
+              Salutation: formFields.salutation,
+              First_Name: formFields.firstName,
+              Last_Name: formFields.lastName || "NA",
+              Email: formFields.email,
+              Phone: formFields.mobile,
+
+              Complete_Address: formFields.address,
+              City_1: formFields.city,
+              State_1: formFields.state,
+              Country_1: formFields.addressCountry || formFields.country,
+              Pincode: formFields.pincode,
+
+              Course_Name: formFields.courseName,
+              Course_Type: formFields.courseType,
+              Lecture_Language: formFields.lectureLanguage,
+              Course_Start_Date: formFields.courseStartDate,
+
+              GST_Treatment: formFields.gstTreatment,
+              Payment_Plan: formFields.paymentMethod,
+
+              PIB_LEAD_ID: pib_id_clean
+            }],
+            trigger: []
+          })
+        }, "UPDATE CONTACT");
+
+      } else {
+        console.log("🟢 No contact found, creating new");
+
+        const newContact = await zohoCall("https://www.zohoapis.in/crm/v2/Contacts", {
+          method: "POST",
+          headers: {
+            Authorization: `Zoho-oauthtoken ${accessToken}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            data: [{
+              Owner: { id: ownerId },
+              Salutation: formFields.salutation,
+              First_Name: formFields.firstName,
+              Last_Name: formFields.lastName || "NA",
+              Email: formFields.email,
+              Phone: formFields.mobile,
+
+              Complete_Address: formFields.address,
+              City_1: formFields.city,
+              State_1: formFields.state,
+              Country_1: formFields.addressCountry || formFields.country,
+              Pincode: formFields.pincode,
+
+              Course_Name: formFields.courseName,
+              Course_Type: formFields.courseType,
+              Lecture_Language: formFields.lectureLanguage,
+              Course_Start_Date: formFields.courseStartDate,
+
+              Payment_Plan: formFields.paymentMethod,
+              GST_Treatment: formFields.gstTreatment,
+
+              Lead_Source: lead.Lead_Source,
+              Lead_Status: lead.Lead_Status,
+              Service_Interested_In: lead.Service_Interested_In,
+              PIB_LEAD_ID: lead.PIB_LEAD_ID
+            }],
+            trigger: []
+          })
+        }, "CREATE CONTACT");
+
+        contactId = newContact.data?.[0]?.details?.id;
+      }
+    }
+
+
+    // 🔹 RESOLVE DEAL
+    let matchedDeal = null;
+
+    if (convertedDealId) {
+      matchedDeal = { id: convertedDealId };
+      console.log("🔗 Using Deal from conversion:", convertedDealId);
+    } else {
+      const dealRes = await fetch(
+        `https://www.zohoapis.in/crm/v2/Deals/search?criteria=((Contact_Name:equals:${contactId})and(PIB_LEAD_ID:equals:"${pib_id_clean}"))`,
+        { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
+      );
+
+      const dealData = await safeParse(dealRes, "DEAL SEARCH");
+
+      if (dealData.data && dealData.data.length > 0) {
+        matchedDeal = dealData.data.find(d => {
+          const linkedContactId = d.Contact_Name?.id || d.Contact_Name;
+          return String(linkedContactId) === String(contactId);
+        });
+      }
+    }
+
+
+    // 🔹 DEAL PAYLOAD
+    const dealPayload = {
+      Deal_Name: formFields.fullName || `${formFields.firstName || ""} ${formFields.lastName || ""}`.trim() || "NA",
+      Owner: { id: ownerId },
+
+      Contact_Name: { id: contactId },
+
+      Pipeline: pipeline,
+      Stage: stage,
+
+      Payment_Method: paymentMethod,
+      Payment_Plan: paymentPlan,
+
+      Total_Fee: formFields.totalFee,
+      Amount_Paid: formFields.amountPaid,
+
+      Payment_Status:
+        paymentMethod === "Course Hold"
+          ? "Hold"
+          : paymentMethod === "Single Shot"
+          ? "Completed"
+          : "Partial",
+
+      Course_Name: formFields.courseName,
+      Course_Type: formFields.courseType,
+      Lecture_Language: formFields.lectureLanguage,
+      Course_Start_Date: formFields.courseStartDate,
+
+      Complete_Address: formFields.address,
+      City_1: formFields.city,
+      State_1: formFields.state,
+      Country_1: formFields.addressCountry || formFields.country,
+      Pincode: formFields.pincode,
+
+      Lead_Source: lead.Lead_Source,
+      Service_Interested_In: lead.Service_Interested_In,
+
+      PIB_LEAD_ID: lead.PIB_LEAD_ID
     };
 
-  const convertRes = await zohoCall(
-    `https://www.zohoapis.in/crm/v2/Leads/${leadId}/actions/convert`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Zoho-oauthtoken ${accessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(convertPayload)
-    },
-    "CONVERT LEAD"
-  );
 
-  const converted = convertRes.data?.[0] || {};
-  convertedContactId = converted.Contacts;
-  convertedDealId = converted.Deals;
+    if (!matchedDeal) {
+      console.log("🟢 Creating Deal");
 
-  console.log("✅ Convert IDs:", { convertedContactId, convertedDealId });
-}
+      await zohoCall("https://www.zohoapis.in/crm/v2/Deals", {
+        method: "POST",
+        headers: {
+          Authorization: `Zoho-oauthtoken ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ data: [dealPayload], trigger: [] })
+      }, "CREATE DEAL");
 
+    } else {
+      console.log("🟡 Updating Deal", matchedDeal.id);
 
-// 🔹 RESOLVE CONTACT — prefer the just-converted Contact ID; otherwise search by PIB_LEAD_ID
-let contactId = null;
+      const dealId = matchedDeal.id;
 
-if (convertedContactId) {
-  // Lead was just converted → Zoho already created a Contact for us.
-  // Just update it with the fresh form data.
-  console.log("🔗 Using contact from conversion:", convertedContactId);
-  contactId = convertedContactId;
+      await zohoCall(`https://www.zohoapis.in/crm/v2/Deals/${dealId}`, {
+        method: "PUT",
+        headers: {
+          Authorization: `Zoho-oauthtoken ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ data: [dealPayload], trigger: [] })
+      }, "UPDATE DEAL");
+    }
 
-  await zohoCall(`https://www.zohoapis.in/crm/v2/Contacts/${contactId}`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Zoho-oauthtoken ${accessToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      data: [{
-        Owner: { id: leadOwnerId },
-        Salutation: formFields.salutation,
-        First_Name: formFields.firstName,
-        Last_Name: formFields.lastName || "NA",
-        Email: formFields.email,     // overwrite Lead's old email with form value
-        Phone: formFields.mobile,    // overwrite Lead's old phone with form value
-
-        Complete_Address: formFields.address,
-        City_1: formFields.city,
-        State_1: formFields.state,
-        Country_1: formFields.addressCountry || formFields.country,
-        Pincode: formFields.pincode,
-
-        Course_Name: formFields.courseName,
-        Course_Type: formFields.courseType,
-        Lecture_Language: formFields.lectureLanguage,
-        Course_Start_Date: formFields.courseStartDate,
-
-        Payment_Plan: formFields.paymentMethod,
-        GST_Treatment: formFields.gstTreatment,
-
-        PIB_LEAD_ID: pib_id_clean
-      }]
-    })
-  }, "UPDATE CONVERTED CONTACT");
-
-} else {
-  // No Lead conversion happened (re-submission case — Lead was already converted before).
-  // Search by PIB_LEAD_ID (NOT email — email is unreliable as a key).
-  console.log("🔎 Searching existing Contact by PIB_LEAD_ID");
-
-  const contactRes = await fetch(
-    `https://www.zohoapis.in/crm/v2/Contacts/search?criteria=(PIB_LEAD_ID:equals:"${pib_id_clean}")`,
-    { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
-  );
-
-  const contactData = await safeParse(contactRes, "CONTACT SEARCH BY PIB");
-
-  if (contactData.data && contactData.data.length > 0) {
-
-    console.log("🟡 Contact found, updating");
-    contactId = contactData.data[0].id;
-
-    await zohoCall(`https://www.zohoapis.in/crm/v2/Contacts/${contactId}`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Zoho-oauthtoken ${accessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        data: [{
-          Owner: { id: leadOwnerId },
-          Salutation: formFields.salutation,
-          First_Name: formFields.firstName,
-          Last_Name: formFields.lastName || "NA",
-          Email: formFields.email,
-          Phone: formFields.mobile,
-
-          Complete_Address: formFields.address,
-          City_1: formFields.city,
-          State_1: formFields.state,
-          Country_1: formFields.addressCountry || formFields.country,
-          Pincode: formFields.pincode,
-
-          Course_Name: formFields.courseName,
-          Course_Type: formFields.courseType,
-          Lecture_Language: formFields.lectureLanguage,
-          Course_Start_Date: formFields.courseStartDate,
-
-          GST_Treatment: formFields.gstTreatment,
-          Payment_Plan: formFields.paymentMethod,
-
-          PIB_LEAD_ID: pib_id_clean
-        }]
-      })
-    }, "UPDATE CONTACT");
-
-  } else {
-
-    console.log("🟢 No contact found, creating new");
-
-    const newContact = await zohoCall("https://www.zohoapis.in/crm/v2/Contacts", {
-      method: "POST",
-      headers: {
-        Authorization: `Zoho-oauthtoken ${accessToken}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        data: [{
-          Owner: { id: leadOwnerId },
-          Salutation: formFields.salutation,
-          First_Name: formFields.firstName,
-          Last_Name: formFields.lastName || "NA",
-          Email: formFields.email,
-          Phone: formFields.mobile,
-
-          Complete_Address: formFields.address,
-          City_1: formFields.city,
-          State_1: formFields.state,
-          Country_1: formFields.addressCountry || formFields.country,
-          Pincode: formFields.pincode,
-
-          Course_Name: formFields.courseName,
-          Course_Type: formFields.courseType,
-          Lecture_Language: formFields.lectureLanguage,
-          Course_Start_Date: formFields.courseStartDate,
-
-          Payment_Plan: formFields.paymentMethod,
-          GST_Treatment: formFields.gstTreatment,
-
-          Lead_Source: lead.Lead_Source,
-          Lead_Status: lead.Lead_Status,
-          Service_Interested_In: lead.Service_Interested_In,
-          PIB_LEAD_ID: lead.PIB_LEAD_ID
-        }]
-      })
-    }, "CREATE CONTACT");
-
-    contactId = newContact.data?.[0]?.details?.id;
-  }
-}
-
-
-// 🔹 RESOLVE DEAL — prefer the just-converted Deal ID; otherwise search (for re-submissions)
-let matchedDeal = null;
-
-if (convertedDealId) {
-  // Conversion just ran — use the Deal it created. Skip search to avoid index-lag duplicates.
-  matchedDeal = { id: convertedDealId };
-  console.log("🔗 Using Deal from conversion:", convertedDealId);
-} else {
-  const dealRes = await fetch(
-    `https://www.zohoapis.in/crm/v2/Deals/search?criteria=((Contact_Name:equals:${contactId})and(PIB_LEAD_ID:equals:"${pib_id_clean}"))`,
-    { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
-  );
-
-  const dealData = await safeParse(dealRes, "DEAL SEARCH");
-
-  // Extra safety: even if Zoho returns multiple, only keep deals that belong to THIS contact
-  if (dealData.data && dealData.data.length > 0) {
-    matchedDeal = dealData.data.find(d => {
-      const linkedContactId = d.Contact_Name?.id || d.Contact_Name;
-      return String(linkedContactId) === String(contactId);
+    return res.status(200).json({
+      success: true,
+      message: "Enrollment successful"
     });
+
+  } catch (err) {
+    console.error("🔥 ERROR:", err);
+    return res.status(500).json({ error: err.message });
   }
-}
-
-
-// 🔹 DEAL PAYLOAD
-const dealPayload = {
-  Deal_Name: formFields.fullName || `${formFields.firstName || ""} ${formFields.lastName || ""}`.trim() || "NA",
-  Owner: { id: leadOwnerId },
-
-  Contact_Name: { id: contactId },
-
-  Pipeline: pipeline,
-  Stage: stage,
-
-  Payment_Method: paymentMethod,
-  Payment_Plan: paymentPlan,
-
-  Total_Fee: formFields.totalFee,
-  Amount_Paid: formFields.amountPaid,
-
-  Payment_Status:
-    paymentMethod === "Course Hold"
-      ? "Hold"
-      : paymentMethod === "Single Shot"
-      ? "Completed"
-      : "Partial",
-
-  Course_Name: formFields.courseName,
-  Course_Type: formFields.courseType,
-  Lecture_Language: formFields.lectureLanguage,
-  Course_Start_Date: formFields.courseStartDate,
-
-  Complete_Address: formFields.address,
-  City_1: formFields.city,
-  State_1: formFields.state,
-  Country_1: formFields.addressCountry || formFields.country,
-  Pincode: formFields.pincode,
-
-  Lead_Source: lead.Lead_Source,
-  Service_Interested_In: lead.Service_Interested_In,
-
-  PIB_LEAD_ID: lead.PIB_LEAD_ID
-};
-
-
-if (!matchedDeal) {
-
-  console.log("🟢 Creating Deal");
-
-  await zohoCall("https://www.zohoapis.in/crm/v2/Deals", {
-    method: "POST",
-    headers: {
-      Authorization: `Zoho-oauthtoken ${accessToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ data: [dealPayload] })
-  }, "CREATE DEAL");
-
-} else {
-
-  console.log("🟡 Updating Deal", matchedDeal.id);
-
-  const dealId = matchedDeal.id;
-
-  await zohoCall(`https://www.zohoapis.in/crm/v2/Deals/${dealId}`, {
-    method: "PUT",
-    headers: {
-      Authorization: `Zoho-oauthtoken ${accessToken}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ data: [dealPayload] })
-  }, "UPDATE DEAL");
-}
-
-return res.status(200).json({
-  success: true,
-  message: "Enrollment successful"
-});
-
-} catch (err) {
-console.error("🔥 ERROR:", err);
-return res.status(500).json({ error: err.message });
-}
 }
