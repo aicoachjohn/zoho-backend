@@ -110,13 +110,6 @@ export default async function handler(req, res) {
     }
 
 
-    // 🔹 RESOLVE THE TRUE OWNER
-    // Prefer the Point of Contact from the form (original lead owner, captured at form-load).
-    // Fall back to whatever the Lead/Contact currently has if the form didn't send it.
-    const ownerId = formFields.pointOfContact || leadOwnerId;
-    console.log("👤 Resolved ownerId:", ownerId, "(formFields.pointOfContact:", formFields.pointOfContact, "| leadOwnerId:", leadOwnerId, ")");
-
-
     // 🔹 UPDATE LEAD (only if leadId exists)
     if (leadId) {
       await zohoCall(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
@@ -178,21 +171,18 @@ export default async function handler(req, res) {
 
       console.log("🔄 Converting Lead to Contact + Deal");
 
+      // ✅ No assign_to / Owner — Zoho will inherit the current Lead Owner
       const convertPayload = {
         data: [{
           notify_lead_owner: true,
           notify_new_entity_owner: true,
-
-          // 🔑 assign converted Contact + Account + Deal to the Point of Contact
-          assign_to: ownerId,
 
           Deals: {
             Deal_Name: formFields.fullName || `${formFields.firstName || ""} ${formFields.lastName || ""}`.trim() || "NA",
             Stage: stage,
             Pipeline: pipeline,
             Amount: formFields.totalFee,
-            PIB_LEAD_ID: pib_id_clean,
-            Owner: { id: ownerId }   // 🔑 explicitly set Deal owner inside conversion
+            PIB_LEAD_ID: pib_id_clean
           }
         }]
       };
@@ -233,7 +223,7 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           data: [{
-            Owner: { id: ownerId },
+            // ✅ No Owner — conversion already set it correctly
             Salutation: formFields.salutation,
             First_Name: formFields.firstName,
             Last_Name: formFields.lastName || "NA",
@@ -282,7 +272,7 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({
             data: [{
-              Owner: { id: ownerId },
+              // ✅ No Owner — keep whatever owner the Contact already has
               Salutation: formFields.salutation,
               First_Name: formFields.firstName,
               Last_Name: formFields.lastName || "NA",
@@ -320,7 +310,7 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({
             data: [{
-              Owner: { id: ownerId },
+              Owner: { id: leadOwnerId },   // ✅ use live owner from Zoho, not form
               Salutation: formFields.salutation,
               First_Name: formFields.firstName,
               Last_Name: formFields.lastName || "NA",
@@ -379,9 +369,9 @@ export default async function handler(req, res) {
 
 
     // 🔹 DEAL PAYLOAD
+    // ✅ No Owner — keep whatever owner Zoho assigned during conversion
     const dealPayload = {
       Deal_Name: formFields.fullName || `${formFields.firstName || ""} ${formFields.lastName || ""}`.trim() || "NA",
-      Owner: { id: ownerId },
 
       Contact_Name: { id: contactId },
 
