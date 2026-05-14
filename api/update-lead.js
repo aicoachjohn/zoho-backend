@@ -127,11 +127,6 @@ export default async function handler(req, res) {
         contactOwnerEmail: contact.Owner?.email
       });
     }
-
-
-    // 🔹 RESOLVE THE TRUE OWNER
-    // Prefer the Point of Contact from the form (original lead owner, captured at form-load).
-    // Fall back to whatever the Lead/Contact currently has if the form didn't send it.
     
 // 🔹 UPDATE LEAD (only if leadId exists)
     if (leadId) {
@@ -302,9 +297,8 @@ export default async function handler(req, res) {
             Course_Start_Date: formFields.courseStartDate,
 
             Payment_Plan: formFields.paymentMethod,
-            GST_Treatment: formFields.gstTreatment,
-
-            PIB_LEAD_ID: pib_id_clean
+            GST_Treatment: formFields.gstTreatment
+       
           }],
           trigger: []   // 🔒 prevent workflows from re-firing
         })
