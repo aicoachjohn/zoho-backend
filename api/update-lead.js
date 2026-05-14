@@ -132,11 +132,8 @@ export default async function handler(req, res) {
     // 🔹 RESOLVE THE TRUE OWNER
     // Prefer the Point of Contact from the form (original lead owner, captured at form-load).
     // Fall back to whatever the Lead/Contact currently has if the form didn't send it.
-    const ownerId = formFields.pointOfContact || leadOwnerId;
-    console.log("👤 Resolved ownerId:", ownerId, "(formFields.pointOfContact:", formFields.pointOfContact, "| leadOwnerId:", leadOwnerId, ")");
-
-
-    // 🔹 UPDATE LEAD (only if leadId exists)
+    
+// 🔹 UPDATE LEAD (only if leadId exists)
     if (leadId) {
       await zohoCall(`https://www.zohoapis.in/crm/v2/Leads/${leadId}`, {
         method: "PUT",
