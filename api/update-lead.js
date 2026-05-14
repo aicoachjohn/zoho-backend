@@ -86,6 +86,16 @@ export default async function handler(req, res) {
       lead = leadData.data[0];
       leadOwnerId = lead.Owner.id;
       leadId = lead.id;
+
+      // 🪵 LIVE OWNER AT SUBMIT TIME
+      console.log("🪵 [LEAD OWNER @ SUBMIT]", {
+        pib_id: pib_id_clean,
+        leadId,
+        leadOwnerId,
+        leadOwnerName: lead.Owner?.name,
+        leadOwnerEmail: lead.Owner?.email,
+        formPointOfContact: formFields.pointOfContact || null
+      });
     } else {
       console.log("⚠️ Lead not in Leads, checking Contacts...");
 
@@ -100,13 +110,22 @@ export default async function handler(req, res) {
         return res.status(404).json({ message: "Lead not found in Leads or Contacts" });
       }
 
-      console.log("✅ Found in Contacts (converted lead)");
+    console.log("✅ Found in Contacts (converted lead)");
 
       const contact = contactFallbackData.data[0];
 
       // simulate lead object
       lead = contact;
       leadOwnerId = contact.Owner?.id;
+
+      // 🪵 FALLBACK PATH — owner read from Contacts
+      console.log("🪵 [CONTACT OWNER @ FALLBACK]", {
+        pib_id: pib_id_clean,
+        contactId: contact.id,
+        contactOwnerId: leadOwnerId,
+        contactOwnerName: contact.Owner?.name,
+        contactOwnerEmail: contact.Owner?.email
+      });
     }
 
 
@@ -177,22 +196,23 @@ export default async function handler(req, res) {
     if (leadId) {
 
       console.log("🔄 Converting Lead to Contact + Deal");
+      console.log("🪵 [PRE-CONVERT OWNER]", {
+        leadId,
+        leadOwnerId,
+        leadOwnerName: lead.Owner?.name
+      });
 
       const convertPayload = {
         data: [{
           notify_lead_owner: true,
           notify_new_entity_owner: true,
 
-          // 🔑 assign converted Contact + Account + Deal to the Point of Contact
-          assign_to: ownerId,
-
           Deals: {
             Deal_Name: formFields.fullName || `${formFields.firstName || ""} ${formFields.lastName || ""}`.trim() || "NA",
             Stage: stage,
             Pipeline: pipeline,
             Amount: formFields.totalFee,
-            PIB_LEAD_ID: pib_id_clean,
-            Owner: { id: ownerId }   // 🔑 explicitly set Deal owner inside conversion
+            PIB_LEAD_ID: pib_id_clean
           }
         }]
       };
@@ -215,8 +235,42 @@ export default async function handler(req, res) {
       convertedDealId = converted.Deals;
 
       console.log("✅ Convert IDs:", { convertedContactId, convertedDealId });
-    }
 
+      // 🪵 VERIFY POST-CONVERSION OWNERS
+      try {
+        if (convertedContactId) {
+          const verifyContactRes = await fetch(
+            `https://www.zohoapis.in/crm/v2/Contacts/${convertedContactId}`,
+            { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
+          );
+          const verifyContactData = await safeParse(verifyContactRes, "VERIFY CONTACT");
+          const newContactOwner = verifyContactData.data?.[0]?.Owner;
+          console.log("🪵 [POST-CONVERT CONTACT OWNER]", {
+            convertedContactId,
+            ownerId: newContactOwner?.id,
+            ownerName: newContactOwner?.name,
+            matchesLeadOwner: newContactOwner?.id === leadOwnerId
+          });
+        }
+
+        if (convertedDealId) {
+          const verifyDealRes = await fetch(
+            `https://www.zohoapis.in/crm/v2/Deals/${convertedDealId}`,
+            { headers: { Authorization: `Zoho-oauthtoken ${accessToken}` } }
+          );
+          const verifyDealData = await safeParse(verifyDealRes, "VERIFY DEAL");
+          const newDealOwner = verifyDealData.data?.[0]?.Owner;
+          console.log("🪵 [POST-CONVERT DEAL OWNER]", {
+            convertedDealId,
+            ownerId: newDealOwner?.id,
+            ownerName: newDealOwner?.name,
+            matchesLeadOwner: newDealOwner?.id === leadOwnerId
+          });
+        }
+      } catch (verifyErr) {
+        console.error("⚠️ Post-convert verify failed:", verifyErr.message);
+      }
+    }
 
     // 🔹 RESOLVE CONTACT
     let contactId = null;
@@ -233,7 +287,6 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           data: [{
-            Owner: { id: ownerId },
             Salutation: formFields.salutation,
             First_Name: formFields.firstName,
             Last_Name: formFields.lastName || "NA",
@@ -282,7 +335,6 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({
             data: [{
-              Owner: { id: ownerId },
               Salutation: formFields.salutation,
               First_Name: formFields.firstName,
               Last_Name: formFields.lastName || "NA",
@@ -320,7 +372,7 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({
             data: [{
-              Owner: { id: ownerId },
+              Owner: { id: leadOwnerId },
               Salutation: formFields.salutation,
               First_Name: formFields.firstName,
               Last_Name: formFields.lastName || "NA",
@@ -381,7 +433,6 @@ export default async function handler(req, res) {
     // 🔹 DEAL PAYLOAD
     const dealPayload = {
       Deal_Name: formFields.fullName || `${formFields.firstName || ""} ${formFields.lastName || ""}`.trim() || "NA",
-      Owner: { id: ownerId },
 
       Contact_Name: { id: contactId },
 
@@ -445,6 +496,13 @@ export default async function handler(req, res) {
         body: JSON.stringify({ data: [dealPayload], trigger: [] })
       }, "UPDATE DEAL");
     }
+
+    console.log("🪵 [SUBMIT COMPLETE]", {
+      pib_id: pib_id_clean,
+      leadOwnerId,
+      contactId,
+      dealId: matchedDeal?.id || null
+    });
 
     return res.status(200).json({
       success: true,
