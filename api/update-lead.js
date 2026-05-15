@@ -15,6 +15,15 @@ export default async function handler(req, res) {
 
   if (!pib_id) return res.status(400).json({ message: "Missing pib_id" });
 
+// 🔒 Reject malformed PIB IDs
+if (!/^PIB\s*-?\s*\d+$/i.test(pib_id.trim())) {
+  console.error("❌ Malformed pib_id received:", pib_id);
+  return res.status(400).json({ 
+    message: "Invalid pib_id format — expected 'PIB - <number>'", 
+    received: pib_id 
+  });
+}
+
   async function safeParse(response, label) {
     const text = await response.text();
     console.log(`🔍 ${label}:`, text);
